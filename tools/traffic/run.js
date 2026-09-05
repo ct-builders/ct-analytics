@@ -26,7 +26,9 @@
  */
 
 import { randomUUID } from 'node:crypto';
-import { buildSession, buildShopperPool, rng, sessionStartedAt } from './lib/behaviour.js';
+import {
+  buildSession, buildShopperPool, RETURNING_RATIO, rng, sessionStartedAt
+} from './lib/behaviour.js';
 import { expectedFunnel, PERSONAS } from './lib/personas.js';
 import { listProfiles, loadProfile } from './lib/profile.js';
 import { expectedCounts, openLog, sessionRecord } from './lib/log.js';
@@ -91,7 +93,7 @@ Traffic generator — seeds realistic data and verifies tracking accuracy.
   --target <url>        storefront base URL (browser mode) [CLICKSTREAM_TARGET_URL]
   --endpoint <url>      collector /collect URL (synth mode) [CLICKSTREAM_ENDPOINT]
   --log <path>          action log; this is the ground truth for reconcile.js
-  --loop                keep generating, at --rate-per-minute, until stopped
+  --loop                keep generating until stopped; --sessions is the opening burst
   --rate-per-minute <n> sessions per minute in --loop mode (default 30)
   --headed              show the browser (browser mode)
   --dry-run             print the implied funnel and one sample session, write nothing
@@ -153,9 +155,14 @@ async function main() {
   say(`profile   ${profile.label} (site "${profile.site}")`);
   say(`mode      ${opts.mode}`);
   say(`sessions  ${opts.sessions}${opts.loop ? ` then looping at ${opts.ratePerMinute}/min` : ''}`);
-  if (opts.mode === 'synth') say(`history   ${opts.days} days`);
+  if (opts.mode === 'synth' && !opts.loop) say(`history   ${opts.days} days`);
   say(`shoppers  ${pool.length} browsers, ${customers.length} known customers`);
   say(`log       ${log.path}`);
+  if (opts.loop) {
+    // The log is JSONL and appended per session, so the accuracy check can
+    // read the tail of a run that is still going.
+    say('stop      Ctrl-C (drains); reconcile the tail with reconcile.js --since <iso>');
+  }
   say('');
 
   const driver = opts.mode === 'browser'
@@ -168,31 +175,108 @@ async function main() {
   };
   const now = Date.now();
 
-  const queue = [];
-  for (let i = 0; i < opts.sessions; i++) {
+  /**
+   * Mint session number `i`.
+   *
+   * Sessions are drawn from `rand` in order, which is what makes a seed
+   * reproducible. The drivers draw their own randomness from a derived
+   * per-session seed instead, because they run concurrently and sharing one
+   * generator across workers would make the output depend on which worker
+   * happened to pick a session up.
+   */
+  function mint(i) {
     const shopper = pool[Math.floor(rand() * pool.length)];
-    const startedAt = opts.mode === 'browser'
+    // Looped traffic is happening now, whatever the mode — a backfill's
+    // spread-out start times would date a live session into last week.
+    const startedAt = opts.mode === 'browser' || opts.loop
       ? new Date()
       : sessionStartedAt(rand, { now, days: opts.days });
     const session = buildSession({ rand, profile, shopper, startedAt });
-    // Its own derived seed. The scripts are built sequentially and so are
-    // deterministic, but the drivers also draw randomness (dwell times, user
-    // agents) and they run concurrently — sharing one generator across
-    // workers would make the output depend on scheduling order.
     session.seed = (opts.seed + index_seed(i)) >>> 0;
-    queue.push(session);
+    return session;
   }
+
+  const queue = [];
+  for (let i = 0; i < opts.sessions; i++) queue.push(mint(i));
   // Chronological, so a backfill inserts history in the order it happened and
   // the session upsert never has to reorder itself.
   queue.sort((x, y) => Date.parse(x.startedAt) - Date.parse(y.startedAt));
 
+  const gap = 60_000 / Math.max(1, opts.ratePerMinute);
+  const loopStartedAt = Date.now();
+  let stopping = false;
+  let minted = queue.length;
+  let lagWarnedAt = 0;
+
+  if (opts.loop) {
+    for (const signal of ['SIGINT', 'SIGTERM']) {
+      process.on(signal, () => {
+        // A run killed mid-session leaves the log short of the visit the
+        // browser is still completing, and the accuracy check reads that log
+        // as ground truth — so the first interrupt drains, and only a second
+        // gives up on the sessions in flight.
+        if (stopping) process.exit(130);
+        stopping = true;
+        say('');
+        say('stopping — finishing the sessions in flight (interrupt again to abort)');
+      });
+    }
+  }
+
   let cursor = 0;
-  const workers = Array.from({ length: Math.min(opts.concurrency, queue.length) }, () =>
-    (async () => {
+
+  /**
+   * The next session to run, or null once the run is over.
+   *
+   * In loop mode this is also where the rate is held: a worker that finishes
+   * early waits here for its session to come due rather than racing ahead.
+   */
+  async function nextSession() {
+    const index = cursor++;
+    if (index < queue.length) return queue[index];
+    if (!opts.loop || stopping) return null;
+
+    const dueAt = loopStartedAt + (index - queue.length + 1) * gap;
+    for (;;) {
+      if (stopping) return null;
+      const wait = dueAt - Date.now();
+      if (wait <= 0) {
+        // Asking for more sessions per minute than the drivers can deliver is
+        // otherwise silent: the log just fills slower than the flag claims.
+        if (wait < -30_000 && Date.now() - lagWarnedAt > 300_000) {
+          lagWarnedAt = Date.now();
+          say(`  behind schedule by ${Math.round(-wait / 1000)}s — ${opts.mode} mode at ` +
+              `concurrency ${opts.concurrency} cannot sustain ${opts.ratePerMinute}/min`);
+        }
+        break;
+      }
+      // In slices, so an interrupt is noticed promptly rather than only after
+      // a whole gap has elapsed.
+      await sleep(Math.min(wait, 250));
+    }
+    if (stopping) return null;
+
+    // Shoppers accumulate the way a real audience does, holding the returning
+    // share a finite run has. A fixed pool would funnel an indefinite run's
+    // thousands of visits through the same few browsers, and every figure
+    // keyed on shoppers rather than sessions would drift with it.
+    minted += 1;
+    const wanted = Math.max(1, Math.round(minted * RETURNING_RATIO));
+    if (pool.length < wanted) {
+      pool.push(...buildShopperPool({
+        rand, sessions: wanted - pool.length, returningRatio: 1, customers,
+        newId: () => randomUUID()
+      }));
+    }
+    return mint(index);
+  }
+
+  const workers = Array.from(
+    { length: opts.loop ? opts.concurrency : Math.min(opts.concurrency, queue.length) },
+    () => (async () => {
       for (;;) {
-        const index = cursor++;
-        if (index >= queue.length) return;
-        const session = queue[index];
+        const session = await nextSession();
+        if (!session) return;
         try {
           const outcome = driver
             ? await driver.run(session)
@@ -218,8 +302,12 @@ async function main() {
           log.write(sessionRecord({
             session, sessionId: outcome.sessionId, driver: opts.mode, profile, outcome, expected
           }));
-          if (!opts.quiet && stats.sessions % 50 === 0) {
-            say(`  ${stats.sessions}/${queue.length} sessions, ${stats.events} events`);
+          const every = opts.loop ? 10 : 50;
+          if (!opts.quiet && stats.sessions % every === 0) {
+            say(opts.loop
+              ? `  ${stats.sessions} sessions, ${stats.events} events, ` +
+                `${Math.round((Date.now() - loopStartedAt) / 60_000)}m elapsed`
+              : `  ${stats.sessions}/${queue.length} sessions, ${stats.events} events`);
           }
         } catch (err) {
           stats.failed += 1;
@@ -239,7 +327,8 @@ async function main() {
   await log.close();
 
   say('');
-  say(`done: ${stats.sessions} sessions, ${stats.events} events accepted`);
+  say(`done: ${stats.sessions} sessions, ${stats.events} events accepted` +
+      (opts.loop ? ` from ${pool.length} browsers` : ''));
   if (stats.rejected) say(`WARNING: ${stats.rejected} events rejected by the collector`);
   if (stats.failed) say(`WARNING: ${stats.failed} sessions failed`);
   if (Object.keys(stats.skipped).length) {
@@ -311,6 +400,8 @@ function dryRun(profile, rand, customers) {
 function index_seed(i) {
   return Math.imul(i + 1, 0x9e3779b1);
 }
+
+const sleep = (ms) => new Promise((resolve) => { setTimeout(resolve, ms); });
 
 const say = (s) => { if (!opts.quiet || !s) console.log(s); };
 const pct = (n, d) => (d ? `${((n / d) * 100).toFixed(1)}%` : '—');

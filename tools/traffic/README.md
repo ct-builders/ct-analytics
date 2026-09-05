@@ -117,6 +117,36 @@ would prove nothing.
 JSONL so a long run can be tailed while it is still going, and so a crash
 leaves every completed line readable.
 
+## Standing traffic
+
+`--loop` keeps generating until the process is stopped, at
+`--rate-per-minute`. `--sessions` becomes the opening burst.
+
+```bash
+node tools/traffic/run.js --profile thegoodstore --mode browser --loop \
+  --rate-per-minute 2 --concurrency 2 --sessions 0 \
+  --target https://store.example.com
+```
+
+Sessions are minted on demand and paced, so a worker that finishes early waits
+for its session to come due rather than racing ahead. Ask for more per minute
+than the drivers can deliver — easy to do in browser mode, where a session is
+a minute of real page loads — and it says so rather than quietly filling the
+log slower than the flag claims.
+
+Shoppers accumulate as the run goes, holding the returning-visitor share a
+finite run has. A fixed pool would funnel thousands of visits through the same
+few browsers, and every figure keyed on shoppers rather than sessions would
+drift with it.
+
+Ctrl-C drains: the sessions already in flight finish, so the log is never
+short of a visit the browser was still completing. A second interrupt gives up
+on them.
+
+Because the log is appended per session, `reconcile.js --since <iso>` checks
+the tail of a run that is still going — which is how the hourly accuracy check
+samples standing traffic.
+
 ## What reconcile.js reports
 
 Three classes, in descending severity:
@@ -148,7 +178,8 @@ failure to run — so it can gate a scheduled job.
 --target <url>        storefront base URL (browser mode)
 --endpoint <url>      collector /collect URL (synth mode)
 --log <path>          action log path
---loop                keep generating at --rate-per-minute until stopped
+--loop                keep generating until stopped; --sessions is the opening burst
+--rate-per-minute <n> sessions per minute in --loop mode (default 30)
 --headed              show the browser (browser mode)
 --dry-run             print the plan, write nothing
 --quiet               summary only

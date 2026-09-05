@@ -248,7 +248,11 @@ export function buildSession({ rand, profile, shopper, startedAt, persona }) {
  * "sessions" and the returning-visitor numbers are not all 1:1 — which is the
  * giveaway that data was generated one session at a time.
  */
-export function buildShopperPool({ rand, sessions, customers, returningRatio = 0.6, newId }) {
+export const RETURNING_RATIO = 0.6;
+
+export function buildShopperPool({
+  rand, sessions, customers, returningRatio = RETURNING_RATIO, newId
+}) {
   const count = Math.max(1, Math.round(sessions * returningRatio));
   const pool = [];
   for (let i = 0; i < count; i++) {
