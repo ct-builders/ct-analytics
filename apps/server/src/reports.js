@@ -14,7 +14,7 @@
  *
  * All of them start from the same `scoped` CTE, which joins events to their
  * session and applies the shared segment filter. That is what makes "last 7
- * days, mobile, signed-in" mean the same thing on all thirteen.
+ * days, mobile, signed-in" mean the same thing on every one of them.
  */
 
 import { rows, one } from './db.js';
@@ -555,6 +555,111 @@ const products = {
   }
 };
 
+/**
+ * Product pairs that share an order.
+ *
+ * The pair is unordered — a basket holding A and B is one observation, not two
+ * — so each pair appears on one row with the attach rate read in both
+ * directions. They are rarely the same number: a cable sells with almost every
+ * laptop, and a laptop sells with a small fraction of cables.
+ *
+ * Lift is here because a raw co-occurrence count is mostly a popularity list.
+ * It divides the pair's share of orders by the share the two products would
+ * take together if neither influenced the other, so a genuine affinity between
+ * two mid-volume products outranks two bestsellers that merely meet often.
+ *
+ * Built from `order_items` rather than from add-to-cart events on purpose: an
+ * abandoned cart is not a basket, and a shopper who adds and removes has not
+ * bought the pair.
+ */
+const boughtTogether = {
+  key: 'bought-together',
+  title: 'Bought together',
+  blurb: 'Products that share an order, with the attach rate in each direction.',
+  group: 'Products',
+  columns: [
+    { key: 'product_a', label: 'Product', type: T.text },
+    { key: 'sku_a', label: 'SKU', type: T.code },
+    { key: 'product_b', label: 'Bought with', type: T.text },
+    { key: 'sku_b', label: 'SKU', type: T.code },
+    { key: 'pair_orders', label: 'Orders together', type: T.number },
+    { key: 'a_rate', label: 'Attach to first', type: T.percent },
+    { key: 'b_rate', label: 'Attach to second', type: T.percent },
+    { key: 'lift', label: 'Lift', type: T.number },
+    { key: 'revenue', label: 'Pair revenue', type: T.money }
+  ],
+  async run(f) {
+    const s = scoped(f);
+    const r = await rows(
+      `WITH ${s.cte},
+       lines AS (
+         SELECT oi.event_id,
+                COALESCE(oi.sku, oi.product_key, oi.product_id)         AS identity,
+                MAX(COALESCE(oi.product_name, oi.product_key, oi.sku))  AS name,
+                MAX(oi.sku)                                             AS sku,
+                SUM(oi.quantity * COALESCE(oi.unit_amount, 0))          AS amount,
+                MODE() WITHIN GROUP (ORDER BY oi.currency)              AS currency
+           FROM order_items oi
+           JOIN scoped oe ON oe.id = oi.event_id
+          WHERE COALESCE(oi.sku, oi.product_key, oi.product_id) IS NOT NULL
+          -- One row per product per order, so a basket holding two sizes of
+          -- the same product does not pair it with itself.
+          GROUP BY oi.event_id, identity
+       ),
+       totals AS (
+         SELECT COUNT(DISTINCT event_id) AS orders,
+                MODE() WITHIN GROUP (ORDER BY currency)
+                  FILTER (WHERE currency IS NOT NULL) AS currency
+           FROM lines
+       ),
+       per_product AS (
+         SELECT identity, MAX(name) AS name, MAX(sku) AS sku,
+                COUNT(DISTINCT event_id) AS orders
+           FROM lines
+          GROUP BY identity
+       ),
+       pairs AS (
+         -- Greater-than rather than not-equal yields each pair once, in a
+         -- stable direction.
+         SELECT a.identity                  AS a_id,
+                b.identity                  AS b_id,
+                COUNT(DISTINCT a.event_id)  AS pair_orders,
+                SUM(a.amount + b.amount)    AS revenue
+           FROM lines a
+           JOIN lines b ON b.event_id = a.event_id AND b.identity > a.identity
+          GROUP BY a.identity, b.identity
+       )
+       SELECT pa.name AS product_a, pa.sku AS sku_a,
+              pb.name AS product_b, pb.sku AS sku_b,
+              p.pair_orders,
+              p.revenue,
+              t.currency,
+              (p.pair_orders::numeric / pa.orders) * 100 AS a_rate,
+              (p.pair_orders::numeric / pb.orders) * 100 AS b_rate,
+              CASE WHEN t.orders > 0
+                   THEN (p.pair_orders::numeric * t.orders) / (pa.orders::numeric * pb.orders)
+                   ELSE NULL END                         AS lift
+         FROM pairs p
+         JOIN per_product pa ON pa.identity = p.a_id
+         JOIN per_product pb ON pb.identity = p.b_id
+        CROSS JOIN totals t
+        ORDER BY p.pair_orders DESC, p.revenue DESC NULLS LAST, pa.name, pb.name
+        LIMIT $${s.next}`,
+      [...s.params, f.limit]
+    );
+    return {
+      rows: r,
+      currency: r.find((x) => x.currency)?.currency ?? null,
+      note:
+        'A pair counts once per order, whatever the quantities. Attach to first is the share of ' +
+        'orders containing the left-hand product that also contained the right-hand one, and the ' +
+        'next column reads it the other way. Lift above 1 means the two sell together more often ' +
+        'than their individual popularity would produce on its own; near 1 is coincidence. A pair ' +
+        'seen in one or two orders can carry a large lift, so read it next to the order count.'
+    };
+  }
+};
+
 /* -------------------------------------------------------- omnichannel */
 
 
@@ -1008,6 +1113,7 @@ export const REPORTS = [
   facets,
   categories,
   products,
+  boughtTogether,
   fulfillmentMix,
   storePerformance,
   orders,

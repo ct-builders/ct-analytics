@@ -1,8 +1,13 @@
 # The reports
 
-Fourteen reports, all sharing one set of segment filters. Adding another is one
+Seventeen reports, all sharing one set of segment filters. Adding another is one
 entry in `apps/server/src/reports.js` — the admin renders the catalog
 generically.
+
+Every table sorts by clicking a column header, largest first on a number and
+A to Z on a name, and a second click reverses it. Rows with nothing in the
+column stay at the bottom either way. The sort covers the rows on the page, so
+raise **Rows** before sorting a report the row limit has truncated.
 
 ## Segment filters
 
@@ -85,6 +90,22 @@ revenue per product.
 
 A high view count with a low view-to-cart rate is a product whose listing
 promises more than its detail page delivers.
+
+**Bought together** — product pairs that share an order, with the attach rate
+read in both directions, a lift score and the revenue the two lines earned in
+those orders.
+
+The two attach rates are rarely the same number, and the difference is the
+finding: a scarf that goes into 60% of jacket orders while jackets appear in
+15% of scarf orders is an add-on to promote on the jacket page, not the other
+way round.
+
+Lift divides the pair's share of orders by the share the two products would
+take together if neither influenced the other. Above 1 is an affinity; near 1
+is two popular products meeting by volume. Read it next to the order count —
+a pair seen twice can carry a large lift and mean nothing.
+
+Built from order lines, so an abandoned cart is not a basket.
 
 ## Orders
 

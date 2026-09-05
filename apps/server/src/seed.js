@@ -49,6 +49,26 @@ const CATALOG = [
   { sku: 'SN-61', productKey: 'canvas-sneaker', name: 'Canvas Sneaker', categoryPath: 'shoes/sneakers', price: 7900, color: 'white', size: '9' }
 ];
 
+/**
+ * What a shopper reaches for alongside something else.
+ *
+ * Baskets are not random pairs. A second line picked uniformly from the
+ * catalog would give every pair the same lift, and Bought together would then
+ * be a popularity list dressed up as an affinity — the one thing that report
+ * exists not to be. The accessories carry most of the attachments here, which
+ * is also what a real apparel catalog does.
+ */
+const COMPANIONS = {
+  'SW-42': ['AC-51', 'TR-21'],
+  'SW-43': ['AC-51'],
+  'SH-11': ['TR-21', 'AC-52'],
+  'SH-12': ['TR-21'],
+  'TR-21': ['AC-52', 'SN-61'],
+  'JK-31': ['AC-51'],
+  'JK-32': ['AC-51'],
+  'SN-61': ['TR-21']
+};
+
 /** Terms that find something, weighted so a few dominate as in real traffic. */
 const QUERIES = [
   'merino', 'merino', 'merino', 'sweater', 'sweater', 'shirt', 'shirt',
@@ -254,27 +274,61 @@ function buildSession(rand, startedAt) {
       return { events, userAgent: weighted(rand, DEVICES).ua };
     }
 
-    push({ type: 'cart_view', cartTotal: money(chosen.price * quantity), itemCount: quantity, path: '/cart' });
+    // A second line, found from the first product's page rather than from the
+    // listing — which is where an accessory is actually picked up.
+    const lines = [{ product: productRef, quantity }];
+    const companions = COMPANIONS[chosen.sku];
+    if (companions && rand() < 0.4) {
+      const alsoSku = pick(rand, companions);
+      const also = CATALOG.find((p) => p.sku === alsoSku);
+      const alsoRef = {
+        sku: also.sku,
+        productKey: also.productKey,
+        name: also.name,
+        categoryPath: also.categoryPath,
+        price: money(also.price)
+      };
+      const alsoAttr = { discoveryId: randomUUID(), discoveryType: 'recommendation' };
+      push({
+        type: 'page_view',
+        pageType: 'product',
+        path: `/product/${also.productKey}`,
+        title: also.name
+      });
+      push({ type: 'product_view', product: alsoRef, attribution: alsoAttr });
+      push({
+        type: 'add_to_cart',
+        product: alsoRef,
+        quantity: 1,
+        cartTotal: money(chosen.price * quantity + also.price),
+        attribution: alsoAttr
+      });
+      lines.push({ product: alsoRef, quantity: 1 });
+    }
+
+    const cartTotal = lines.reduce((n, l) => n + l.product.price.centAmount * l.quantity, 0);
+    const units = lines.reduce((n, l) => n + l.quantity, 0);
+
+    push({ type: 'cart_view', cartTotal: money(cartTotal), itemCount: units, path: '/cart' });
 
     if (rand() > 0.35) {
       push({
         type: 'checkout_start',
-        cartTotal: money(chosen.price * quantity),
-        itemCount: quantity,
+        cartTotal: money(cartTotal),
+        itemCount: units,
         path: '/checkout'
       });
       push({ type: 'checkout_step', step: 'shipping', path: '/checkout/shipping' });
 
       if (rand() > 0.25) {
         push({ type: 'checkout_step', step: 'payment', path: '/checkout/payment' });
-        const total = chosen.price * quantity;
         push({
           type: 'order_submit',
           orderId: randomUUID(),
           orderNumber: `A-${1000 + Math.floor(rand() * 9000)}`,
-          total: money(total),
-          itemCount: quantity,
-          items: [{ product: productRef, quantity }],
+          total: money(cartTotal),
+          itemCount: units,
+          items: lines,
           path: '/order-confirmation',
           attribution: withFacets
         });
