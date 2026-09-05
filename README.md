@@ -113,6 +113,19 @@ end to end, including the least-privilege service account, the connection
 string, and what to set before real traffic reaches it. Any Postgres 14+ works;
 nothing here is Google-specific beyond that document.
 
+## Seeding and verifying
+
+`tools/traffic/` generates shopper traffic from a behaviour model of five
+personas. It writes weeks of plausible history in under a minute, and it drives
+a real browser through a real storefront to check the tracking captured what
+the shopper actually did — field by field, against the intent it was given.
+
+```bash
+node tools/traffic/run.js --profile <store> --dry-run
+```
+
+See [tools/traffic/README.md](tools/traffic/README.md).
+
 ## The reports
 
 | Report | Answers |
@@ -130,6 +143,8 @@ nothing here is Google-specific beyond that document.
 | Pages | Traffic by page type and path |
 | Sign-ins | Sign-in activity by registered shoppers |
 | Sessions | Every visit, openable into the shopper's whole journey |
+| Fulfilment mix | How shoppers chose to receive orders, and what share of revenue the store network carried |
+| Store performance | Every location the online channel sent business to |
 | Install health | Events the collector refused, and why |
 
 Every one shares the same segment filters: date range, site, device, store,
@@ -175,7 +190,7 @@ npm test
 npm run typecheck
 ```
 
-81 tests, no network access and no fixtures beyond a scratch database. The
+119 tests, no network access and no fixtures beyond a scratch database. The
 end-to-end suite boots the collector, loads the real `clickstream.js` into a
 browser-shaped scope, drives a shopper journey over HTTP into Postgres, and
 reads the numbers back out through the real reports.

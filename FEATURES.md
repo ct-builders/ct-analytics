@@ -160,6 +160,42 @@ Read-only; no route writes anything.
   number to order events sharing a millisecond
 - `BIGINT` and `NUMERIC` parsed to JS numbers at the driver
 
+## Omnichannel
+
+- Closed set of five fulfilment methods: delivery, pick-up, curbside, reserve,
+  ship-from-store. Case and spacing normalised; anything outside the set dropped
+- Physical location as a stable key plus a denormalised name, kept separate from
+  the session's sales channel
+- Fulfilment recorded from `add_to_cart` onward, not only on the order, so an
+  abandoned basket that wanted a store is still visible
+- Order lines carry their own fulfilment and location, falling back to the
+  order's — a mixed basket can ship one line and hold another
+- **Fulfilment mix** report: the aggregate, stating what share of revenue the
+  store network carried
+- **Store performance** report: the same business split by location
+- Revenue computed from order lines rather than order totals, so a mixed basket
+  is not credited entirely to one method
+
+## Traffic generator — `tools/traffic/`
+
+- One behaviour model, two drivers: `synth` posts events directly (weeks of
+  history in under a minute), `browser` drives a real page with Playwright
+- Emits an abstract intent script, so backfilled and browser-driven data are the
+  same shape, and the accuracy check is exact rather than statistical
+- Five shopper personas; the funnel is an outcome of the mix, not a dice roll
+- `--dry-run` prints the persona mix, the funnel it implies, and a sample
+  session translated to events
+- Deterministic, with per-session derived seeds so concurrency cannot change the
+  output
+- Recency-weighted history and a two-peak hour-of-day curve
+- Returning-shopper pool, so shoppers are meaningfully fewer than sessions
+- Weighted device mix, so the reports are not all desktop
+- Store-fulfilment choice drawn from what each location actually offers
+- Store profiles are one JSON file and carry no hostname
+- `reconcile.js` compares the action log against captured data field by field,
+  classifying findings as missing-session, missing-events, wrong-field or
+  extra-events; its exit code gates a scheduled job
+
 ## Operations
 
 - Migration runner: filename-ordered, one transaction per file, recorded and
@@ -177,10 +213,10 @@ Read-only; no route writes anything.
   ingest path
 - `Dockerfile` with dependency-layer caching
 
-## Tests — 81, offline
+## Tests — 119, offline
 
 - `packages/shared` (18) — validation policy, clock clamping, funnel integrity
-- `packages/browser` (38) — attribution across 10 scenarios including survival
+- `packages/browser` (41) — attribution across 10 scenarios including survival
   of a full page navigation; queue, batching, beacon-on-hide, hashing,
   de-duplication, all three integration levels, hostile storage, failing
   transport
