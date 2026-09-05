@@ -37,7 +37,7 @@
   },
   "facets": [
     {
-      "name": "eco-claim",
+      "name": "eco-claims",
       "values": [
         "fsc-oak",
         "low-voc-finish",
@@ -281,7 +281,7 @@
       "priceCents": 249900,
       "categoryPath": "sofas",
       "attrs": {
-        "eco-claim": "recycled-linen"
+        "eco-claims": "recycled-linen"
       }
     },
     {
@@ -291,7 +291,7 @@
       "priceCents": 129900,
       "categoryPath": "sofas",
       "attrs": {
-        "eco-claim": "reclaimed-ash"
+        "eco-claims": "reclaimed-ash"
       }
     },
     {
@@ -301,7 +301,7 @@
       "priceCents": 259900,
       "categoryPath": "sofas",
       "attrs": {
-        "eco-claim": "organic-cotton"
+        "eco-claims": "organic-cotton"
       }
     },
     {
@@ -311,7 +311,7 @@
       "priceCents": 359900,
       "categoryPath": "sofas",
       "attrs": {
-        "eco-claim": "natural-latex"
+        "eco-claims": "natural-latex"
       }
     },
     {
@@ -321,7 +321,7 @@
       "priceCents": 54900,
       "categoryPath": "sofas",
       "attrs": {
-        "eco-claim": "natural-latex"
+        "eco-claims": "natural-latex"
       }
     },
     {
@@ -331,7 +331,7 @@
       "priceCents": 239900,
       "categoryPath": "sofas",
       "attrs": {
-        "eco-claim": "natural-latex"
+        "eco-claims": "natural-latex"
       }
     },
     {
@@ -341,7 +341,7 @@
       "priceCents": 89900,
       "categoryPath": "beds",
       "attrs": {
-        "eco-claim": "reclaimed-ash"
+        "eco-claims": "reclaimed-ash"
       }
     },
     {
@@ -351,7 +351,7 @@
       "priceCents": 45000,
       "categoryPath": "beds",
       "attrs": {
-        "eco-claim": "low-voc-finish"
+        "eco-claims": "low-voc-finish"
       }
     },
     {
@@ -361,7 +361,7 @@
       "priceCents": 159900,
       "categoryPath": "beds",
       "attrs": {
-        "eco-claim": "recycled-linen"
+        "eco-claims": "recycled-linen"
       }
     },
     {
@@ -371,7 +371,7 @@
       "priceCents": 45999,
       "categoryPath": "beds",
       "attrs": {
-        "eco-claim": "low-voc-finish"
+        "eco-claims": "low-voc-finish"
       }
     },
     {
@@ -381,7 +381,7 @@
       "priceCents": 129900,
       "categoryPath": "beds",
       "attrs": {
-        "eco-claim": "organic-cotton"
+        "eco-claims": "organic-cotton"
       }
     },
     {
@@ -391,7 +391,7 @@
       "priceCents": 99900,
       "categoryPath": "beds",
       "attrs": {
-        "eco-claim": "fsc-oak"
+        "eco-claims": "fsc-oak"
       }
     },
     {
@@ -401,7 +401,7 @@
       "priceCents": 329900,
       "categoryPath": "beds",
       "attrs": {
-        "eco-claim": "low-voc-finish"
+        "eco-claims": "low-voc-finish"
       }
     },
     {
@@ -411,7 +411,7 @@
       "priceCents": 259900,
       "categoryPath": "beds",
       "attrs": {
-        "eco-claim": "organic-cotton"
+        "eco-claims": "organic-cotton"
       }
     },
     {
@@ -421,7 +421,7 @@
       "priceCents": 320000,
       "categoryPath": "living-room-tables",
       "attrs": {
-        "eco-claim": "fsc-oak"
+        "eco-claims": "fsc-oak"
       }
     },
     {
@@ -431,7 +431,7 @@
       "priceCents": 25999,
       "categoryPath": "living-room-tables",
       "attrs": {
-        "eco-claim": "recycled-steel"
+        "eco-claims": "recycled-steel"
       }
     },
     {
@@ -441,7 +441,7 @@
       "priceCents": 8999,
       "categoryPath": "living-room-tables",
       "attrs": {
-        "eco-claim": "fsc-oak"
+        "eco-claims": "fsc-oak"
       }
     },
     {
@@ -451,7 +451,7 @@
       "priceCents": 12000,
       "categoryPath": "living-room-tables",
       "attrs": {
-        "eco-claim": "organic-cotton"
+        "eco-claims": "organic-cotton"
       }
     },
     {
@@ -461,7 +461,7 @@
       "priceCents": 7900,
       "categoryPath": "living-room-tables",
       "attrs": {
-        "eco-claim": "reclaimed-ash"
+        "eco-claims": "reclaimed-ash"
       }
     },
     {
@@ -471,7 +471,7 @@
       "priceCents": 159900,
       "categoryPath": "storage-and-tables",
       "attrs": {
-        "eco-claim": "recycled-linen"
+        "eco-claims": "recycled-linen"
       }
     },
     {
@@ -481,7 +481,7 @@
       "priceCents": 179900,
       "categoryPath": "storage-and-tables",
       "attrs": {
-        "eco-claim": "natural-latex"
+        "eco-claims": "natural-latex"
       }
     },
     {
@@ -491,7 +491,7 @@
       "priceCents": 259900,
       "categoryPath": "storage-and-tables",
       "attrs": {
-        "eco-claim": "recycled-wool"
+        "eco-claims": "recycled-wool"
       }
     },
     {
@@ -501,7 +501,7 @@
       "priceCents": 159900,
       "categoryPath": "storage-and-tables",
       "attrs": {
-        "eco-claim": "recycled-wool"
+        "eco-claims": "recycled-wool"
       }
     },
     {
@@ -511,7 +511,7 @@
       "priceCents": 29900,
       "categoryPath": "storage-and-tables",
       "attrs": {
-        "eco-claim": "recycled-wool"
+        "eco-claims": "recycled-wool"
       }
     },
     {
@@ -521,7 +521,7 @@
       "priceCents": 599,
       "categoryPath": "kitchen",
       "attrs": {
-        "eco-claim": "fsc-oak"
+        "eco-claims": "fsc-oak"
       }
     },
     {
@@ -531,7 +531,7 @@
       "priceCents": 149,
       "categoryPath": "kitchen",
       "attrs": {
-        "eco-claim": "organic-cotton"
+        "eco-claims": "organic-cotton"
       }
     },
     {
@@ -541,7 +541,7 @@
       "priceCents": 2499,
       "categoryPath": "kitchen",
       "attrs": {
-        "eco-claim": "low-voc-finish"
+        "eco-claims": "low-voc-finish"
       }
     },
     {
@@ -551,7 +551,7 @@
       "priceCents": 1099,
       "categoryPath": "kitchen",
       "attrs": {
-        "eco-claim": "recycled-linen"
+        "eco-claims": "recycled-linen"
       }
     },
     {
@@ -561,7 +561,7 @@
       "priceCents": 799,
       "categoryPath": "kitchen",
       "attrs": {
-        "eco-claim": "fsc-oak"
+        "eco-claims": "fsc-oak"
       }
     },
     {
@@ -571,7 +571,7 @@
       "priceCents": 899,
       "categoryPath": "kitchen",
       "attrs": {
-        "eco-claim": "recycled-linen"
+        "eco-claims": "recycled-linen"
       }
     },
     {
@@ -581,7 +581,7 @@
       "priceCents": 1999,
       "categoryPath": "kitchen",
       "attrs": {
-        "eco-claim": "recycled-linen"
+        "eco-claims": "recycled-linen"
       }
     },
     {
@@ -591,7 +591,7 @@
       "priceCents": 2599,
       "categoryPath": "kitchen",
       "attrs": {
-        "eco-claim": "organic-cotton"
+        "eco-claims": "organic-cotton"
       }
     },
     {
@@ -601,7 +601,7 @@
       "priceCents": 899,
       "categoryPath": "home-decor",
       "attrs": {
-        "eco-claim": "recycled-linen"
+        "eco-claims": "recycled-linen"
       }
     },
     {
@@ -611,7 +611,7 @@
       "priceCents": 5999,
       "categoryPath": "home-decor",
       "attrs": {
-        "eco-claim": "recycled-steel"
+        "eco-claims": "recycled-steel"
       }
     },
     {
@@ -621,7 +621,7 @@
       "priceCents": 39900,
       "categoryPath": "home-decor",
       "attrs": {
-        "eco-claim": "natural-latex"
+        "eco-claims": "natural-latex"
       }
     },
     {
@@ -631,7 +631,7 @@
       "priceCents": 1099,
       "categoryPath": "home-decor",
       "attrs": {
-        "eco-claim": "recycled-steel"
+        "eco-claims": "recycled-steel"
       }
     },
     {
@@ -641,7 +641,7 @@
       "priceCents": 25000,
       "categoryPath": "home-decor",
       "attrs": {
-        "eco-claim": "natural-latex"
+        "eco-claims": "natural-latex"
       }
     },
     {
@@ -651,7 +651,7 @@
       "priceCents": 13999,
       "categoryPath": "home-decor",
       "attrs": {
-        "eco-claim": "natural-latex"
+        "eco-claims": "natural-latex"
       }
     },
     {
@@ -661,7 +661,7 @@
       "priceCents": 1499,
       "categoryPath": "home-decor",
       "attrs": {
-        "eco-claim": "low-voc-finish"
+        "eco-claims": "low-voc-finish"
       }
     }
   ],
