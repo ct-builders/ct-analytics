@@ -377,6 +377,53 @@ test('auto reporting can be turned off entirely', async () => {
 
 /* ------------------------------------------------------- resilience */
 
+test('context declared in the config reaches every event', async () => {
+  // A server-rendered page declares the store, channel, locale and currency in
+  // the same inline script that configures the client. Ignoring it made every
+  // segment filter in the reports come back empty while looking configured.
+  const page = await loadPage({
+    config: { context: { store: 'us-store', channel: 'web', locale: 'en-US', currency: 'USD' } }
+  });
+  try {
+    page.clickstream.pageView('home');
+    await page.clickstream.flush();
+    await settle();
+    assert.deepEqual(page.events()[0].context, {
+      store: 'us-store',
+      channel: 'web',
+      locale: 'en-US',
+      currency: 'USD'
+    });
+  } finally {
+    page.restore();
+  }
+});
+
+test('identify overrides what the config declared', async () => {
+  const page = await loadPage({ config: { context: { store: 'us-store', locale: 'en-US' } } });
+  try {
+    page.clickstream.identify({ store: 'eu-store' });
+    page.clickstream.pageView('home');
+    await page.clickstream.flush();
+    await settle();
+    assert.deepEqual(page.events()[0].context, { store: 'eu-store', locale: 'en-US' });
+  } finally {
+    page.restore();
+  }
+});
+
+test('config context is copied, not held by reference', async () => {
+  // The client must not mutate the caller's object.
+  const declared = { store: 'us-store' };
+  const page = await loadPage({ config: { context: declared } });
+  try {
+    page.clickstream.identify({ store: 'eu-store' });
+    assert.equal(declared.store, 'us-store', "the caller's object is untouched");
+  } finally {
+    page.restore();
+  }
+});
+
 test('a failing transport never surfaces to the site', async () => {
   const page = await loadPage();
   try {

@@ -516,11 +516,27 @@
     } catch (e) { done(null); }
   }
 
+  /** A one-level copy, so stored state is never handed out by reference. */
+  function shallow(o) {
+    var out = {};
+    for (var k in o) if (has(o, k)) out[k] = o[k];
+    return out;
+  }
+
   /* ----------------------------------------------------------------- queue */
 
   var queue = [];
   var timer = null;
-  var context = {};
+  /**
+   * Session-wide dimensions attached to every event.
+   *
+   * Seeded from `CLICKSTREAM_CONFIG.context`, so a server-rendered page can
+   * declare the store, channel, locale and currency in the same inline script
+   * that configures the client — before any event fires. Without this seed,
+   * a site that set `context` in its config had it silently ignored and every
+   * segment filter in the reports came back empty.
+   */
+  var context = (cfg.context && typeof cfg.context === 'object') ? shallow(cfg.context) : {};
 
   function str(v) {
     if (typeof v !== 'string') return undefined;
@@ -560,12 +576,6 @@
     } catch (e) {
       log('track failed', e);
     }
-  }
-
-  function shallow(o) {
-    var out = {};
-    for (var k in o) if (has(o, k)) out[k] = o[k];
-    return out;
   }
 
   function schedule() {
