@@ -162,7 +162,10 @@ async function main() {
     ? await (await import('./drivers/browser.js')).createBrowserDriver({ profile, opts })
     : null;
 
-  const stats = { sessions: 0, events: 0, rejected: 0, failed: 0, byPersona: {}, byOutcome: {} };
+  const stats = {
+    sessions: 0, events: 0, rejected: 0, failed: 0,
+    byPersona: {}, byOutcome: {}, skipped: {}
+  };
   const now = Date.now();
 
   const queue = [];
@@ -190,15 +193,25 @@ async function main() {
         const index = cursor++;
         if (index >= queue.length) return;
         const session = queue[index];
-        const expected = expectedCounts(session);
         try {
           const outcome = driver
             ? await driver.run(session)
             : await runSynth(session, { profile });
+          // Held to what the driver ACTUALLY DID. A step it could not perform
+          // — a control that moved, a checkout needing a payment method it
+          // does not have — must not be counted as missing tracking, or the
+          // one report that has to be trustworthy cries wolf.
+          const expected = expectedCounts(
+            outcome.performed ? { ...session, steps: outcome.performed } : session
+          );
           stats.sessions += 1;
           stats.events += outcome.accepted ?? 0;
           stats.rejected += outcome.rejected?.length ?? 0;
           stats.byPersona[session.persona] = (stats.byPersona[session.persona] || 0) + 1;
+          for (const s2 of outcome.skipped ?? []) {
+            const label = `${s2.t}: ${s2.reason}`;
+            stats.skipped[label] = (stats.skipped[label] || 0) + 1;
+          }
           const last = session.steps[session.steps.length - 1];
           const reason = last?.reason ?? 'completed';
           stats.byOutcome[reason] = (stats.byOutcome[reason] || 0) + 1;
@@ -212,7 +225,7 @@ async function main() {
           stats.failed += 1;
           log.write(sessionRecord({
             session, sessionId: null, driver: opts.mode, profile,
-            outcome: { accepted: 0 }, expected, error: err
+            outcome: { accepted: 0 }, expected: expectedCounts(session), error: err
           }));
           if (stats.failed <= 3) console.error(`  session failed: ${err.message}`);
           if (stats.failed === 4) console.error('  (further failures suppressed; see the log)');
@@ -229,6 +242,13 @@ async function main() {
   say(`done: ${stats.sessions} sessions, ${stats.events} events accepted`);
   if (stats.rejected) say(`WARNING: ${stats.rejected} events rejected by the collector`);
   if (stats.failed) say(`WARNING: ${stats.failed} sessions failed`);
+  if (Object.keys(stats.skipped).length) {
+    say('');
+    say('steps the driver could not perform (not tracking failures):');
+    for (const [k, v] of Object.entries(stats.skipped).sort((x, y) => y[1] - x[1])) {
+      say(`  ${k.padEnd(28)} ${v}`);
+    }
+  }
   say('');
   say('by persona:');
   for (const [k, v] of Object.entries(stats.byPersona).sort((x, y) => y[1] - x[1])) {

@@ -2,7 +2,7 @@
   "name": "commerce-clickstream",
   "version": "0.1.0",
   "private": true,
-  "description": "Shopper journey analytics for ecommerce sites \u2014 one script tag, a Postgres collector, and a reporting admin",
+  "description": "Shopper journey analytics for ecommerce sites — one script tag, a Postgres collector, and a reporting admin",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -30,6 +30,7 @@
   },
   "devDependencies": {
     "@types/node": "^20.19.30",
+    "playwright": "^1.63.0",
     "typescript": "^5.7.2"
   }
 }

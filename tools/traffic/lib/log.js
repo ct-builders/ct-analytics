@@ -61,6 +61,10 @@ export function sessionRecord({ session, sessionId, driver, profile, outcome, ex
     // The instructions, verbatim. A step is one shopper action; the driver
     // may turn it into more than one event.
     steps: session.steps.map(summariseStep),
+    // What the driver could not do, and why. Kept beside the intent so a run
+    // is diagnosable without re-running it, and so a driver gap is never
+    // mistaken for lost tracking.
+    ...(outcome?.skipped?.length ? { skipped: outcome.skipped } : {}),
     expected,
     outcome,
     ...(error ? { error: String(error.message || error) } : {})
