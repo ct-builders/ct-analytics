@@ -1,0 +1,16 @@
+{
+  "name": "@clickstream/browser",
+  "version": "0.1.0",
+  "description": "One-file shopper journey capture for any ecommerce site",
+  "license": "MIT",
+  "type": "module",
+  "main": "clickstream.js",
+  "files": ["clickstream.js", "snippet.js", "README.md"],
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2"
+  }
+}

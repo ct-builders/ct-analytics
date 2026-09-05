@@ -1,0 +1,67 @@
+<!doctype html>
+<!--
+  SPDX-License-Identifier: MIT
+  Copyright (c) 2026 commercetools GmbH and the ct-builders contributors
+  Freely available, AS IS and UNSUPPORTED. See LICENSE.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Northaven — Journey example storefront</title>
+<link rel="stylesheet" href="/styles.css">
+
+<!-- Level 3 setup: configuration, then the install stub, then the client.
+
+     The stub makes `journey` callable during page parse, before the client
+     has downloaded. Without it, anything reported from inline markup near the
+     top of the page is lost whenever the network is slow. -->
+<script src="/config.js"></script>
+<script>
+  (function (w, d, tag, src) {
+    w.clickstream = w.clickstream || { q: [] };
+    var m = ['track','pageView','search','categoryView','facetApply','facetRemove','sortChange',
+             'resultClick','productView','addToCart','removeFromCart','cartView','checkoutStart',
+             'checkoutStep','orderSubmit','login','logout','identify','flush'];
+    for (var i = 0; i < m.length; i++) (function (n) {
+      if (!w.clickstream[n]) w.clickstream[n] = function () { w.clickstream.q.push([n, arguments]); };
+    })(m[i]);
+    var el = d.createElement(tag); el.src = src; el.defer = true; d.head.appendChild(el);
+  })(window, document, 'script', '/c.js');
+</script>
+</head>
+<body>
+
+<header>
+  <a class="logo" href="/" data-route="/">Northaven</a>
+  <form class="searchbar" id="searchbar" role="search">
+    <input type="search" name="q" id="q" placeholder="Search the shop…" aria-label="Search">
+    <button type="submit">Search</button>
+  </form>
+  <nav class="topnav">
+    <!-- Level 2: a category link instrumented with attributes alone. -->
+    <a href="/category/mens/knitwear" data-route="/category/mens/knitwear">Knitwear</a>
+    <a href="/category/mens/shirts" data-route="/category/mens/shirts">Shirts</a>
+    <a href="/category/mens/outerwear" data-route="/category/mens/outerwear">Outerwear</a>
+    <a href="/cart" data-route="/cart" id="cartlink">Cart (<span id="cartcount">0</span>)</a>
+    <span id="account"></span>
+  </nav>
+</header>
+
+<main id="view" aria-live="polite"></main>
+
+<footer>
+  <p>
+    A deliberately small storefront that fires every Journey event. Open the
+    <a href="http://localhost:8080/report/overview" target="_blank" rel="noreferrer">reports</a>
+    while you click around — events land within a couple of seconds.
+  </p>
+  <p class="hint">
+    Watch the browser console: this page runs the client with <code>debug: true</code>,
+    so every queued and sent batch is logged.
+  </p>
+</footer>
+
+<script src="/app.js"></script>
+</body>
+</html>

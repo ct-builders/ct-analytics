@@ -1,0 +1,35 @@
+{
+  "name": "commerce-clickstream",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Shopper journey analytics for ecommerce sites \u2014 one script tag, a Postgres collector, and a reporting admin",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "workspaces": [
+    "packages/*",
+    "apps/*",
+    "examples/*"
+  ],
+  "scripts": {
+    "start": "npm run start -w @clickstream/server",
+    "dev": "npm run dev -w @clickstream/server",
+    "dev:collect": "npm run dev:collect -w @clickstream/server",
+    "dev:admin": "npm run dev:admin -w @clickstream/server",
+    "dev:storefront": "npm start -w @clickstream/example-storefront",
+    "migrate": "npm run migrate -w @clickstream/server",
+    "seed": "npm run seed -w @clickstream/server",
+    "retention": "npm run retention -w @clickstream/server",
+    "site:add": "node scripts/add-site.js",
+    "db:create": "node scripts/create-db.js",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "predeploy": "npm run typecheck && npm run test"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.30",
+    "typescript": "^5.7.2"
+  }
+}

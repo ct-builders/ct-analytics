@@ -1,0 +1,20 @@
+{
+  "name": "@clickstream/shared",
+  "version": "0.1.0",
+  "description": "Journey event taxonomy and wire validation, shared by the client and collector",
+  "license": "MIT",
+  "type": "module",
+  "main": "events.js",
+  "exports": {
+    "./events": "./events.js",
+    "./wire": "./wire.js"
+  },
+  "files": ["events.js", "wire.js", "README.md"],
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2"
+  }
+}

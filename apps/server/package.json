@@ -1,0 +1,22 @@
+{
+  "name": "@clickstream/server",
+  "version": "0.1.0",
+  "description": "Clickstream collector and reporting admin",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "dev:collect": "MODE=collect node --watch src/server.js",
+    "dev:admin": "MODE=admin node --watch src/server.js",
+    "migrate": "node src/migrate.js",
+    "seed": "node src/seed.js",
+    "retention": "node src/retention.js",
+    "test": "node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "pg": "^8.13.1"
+  }
+}

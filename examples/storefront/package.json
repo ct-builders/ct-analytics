@@ -1,0 +1,12 @@
+{
+  "name": "@clickstream/example-storefront",
+  "version": "0.1.0",
+  "description": "A small storefront that exercises every Journey event, with no framework and no build step",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  }
+}
