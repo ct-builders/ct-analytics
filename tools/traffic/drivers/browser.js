@@ -96,6 +96,18 @@ export async function createBrowserDriver({ profile, opts }) {
       const skipped = [];
       /** What the last result click actually landed on, so the product view that follows inherits it. */
       const lastClick = {};
+      /**
+       * Units the driver actually got into the cart.
+       *
+       * A storefront will not report the start of a checkout for an empty
+       * cart, and it is right not to — a funnel entry with nothing in it is a
+       * figure nobody can act on. So a `checkout` step that follows an
+       * add-to-cart the driver could not perform has to be recorded as
+       * skipped: counting it as performed expects two events the storefront
+       * was correct to withhold, and the accuracy check then reports lost
+       * tracking against a session that was tracked exactly right.
+       */
+      const cart = { units: 0 };
 
       try {
         // Loud, not silent: a gate that will not open makes every event in
@@ -106,7 +118,7 @@ export async function createBrowserDriver({ profile, opts }) {
 
         for (const step of session.steps) {
           try {
-            const did = await perform(page, base, profile, step, session, lastClick);
+            const did = await perform(page, base, profile, step, session, lastClick, cart);
             if (did === true) performed.push(step);
             // A skip says WHY. "Not applicable" covers an expected skip and a
             // selector that has broken with the same three words, and the
@@ -297,7 +309,7 @@ async function go(page, url) {
  * reason it could not be — which goes in the log, so a broken selector reads
  * differently from a facet that was never on this listing.
  */
-async function perform(page, base, profile, step, session, lastClick = {}) {
+async function perform(page, base, profile, step, session, lastClick = {}, cart = { units: 0 }) {
   const sel = profile.selectors;
   const dwell = async (kind) => {
     const [lo, hi] = DWELL[kind] || DWELL.default;
@@ -491,6 +503,7 @@ async function perform(page, base, profile, step, session, lastClick = {}) {
       // Sticky headers and cart drawers overlap controls on a narrow
       // viewport; the intent is the click, not the hit-test.
       await button.click({ force: true });
+      cart.units += 1;
       await dwell('default');
       return true;
     }
@@ -504,11 +517,13 @@ async function perform(page, base, profile, step, session, lastClick = {}) {
       const remove = page.locator("button:has-text('Remove')").first();
       if (!(await remove.count())) return 'nothing in the cart to remove';
       await remove.click();
+      cart.units = Math.max(0, cart.units - 1);
       await dwell('default');
       return true;
     }
 
     case 'checkout': {
+      if (cart.units === 0) return 'nothing in the cart to check out';
       const checkoutPath = pathFor(profile, 'checkout');
       await go(page, base + checkoutPath);
       // A checkout index typically reports the start of checkout once the
