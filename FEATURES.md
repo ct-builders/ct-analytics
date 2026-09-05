@@ -125,9 +125,14 @@ against double installation, and appends the deferred script tag.
 
 Read-only; no route writes anything.
 
-- 14 reports: Overview, Funnel, Searches, Zero-result searches, Search to
+- 17 reports: Overview, Funnel, Searches, Zero-result searches, Search to
   product, Revenue by discovery, Filters and facets, Categories browsed,
-  Products, Orders, Pages, Sign-ins, Sessions, Install health
+  Products, Bought together, Fulfilment mix, Store performance, Orders, Pages,
+  Sign-ins, Sessions, Install health
+- Market-basket pairs from `order_items`: co-occurrence count, the attach rate
+  in both directions, and lift against independent popularity
+- Every table sortable by clicking a header, on the raw value rather than the
+  formatted text, with empty cells held at the bottom in both directions
 - Session journey view — one visit's full ordered trail with plain-language
   event summaries
 - Shared segment filters: site, named range, explicit from/to, device,

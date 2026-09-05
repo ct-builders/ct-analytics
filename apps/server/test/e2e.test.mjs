@@ -24,6 +24,7 @@ process.env.CLICKSTREAM_ADMIN_TOKEN = ADMIN_TOKEN;
 
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { createHash } from 'node:crypto';
 import { loadClient, scratchDatabase, startServer, until, REPO_ROOT, INGEST_KEY } from './helpers.mjs';
 
 let db;
@@ -344,4 +345,127 @@ test('report values are escaped, not injected', async () => {
   const html = await (await fetch(`${server.base}/report/searches?token=${ADMIN_TOKEN}&range=all`)).text();
   assert.ok(html.includes('&lt;img src=x onerror=alert(1)&gt;'), 'escaped');
   assert.ok(!html.includes('<img src=x'), 'not injected');
+});
+
+/**
+ * Post one order straight at the collector.
+ *
+ * The browser client is driven end to end above; what matters here is the
+ * shape of the basket, and building three of them through the fake DOM would
+ * bury that under setup.
+ */
+async function postOrder(sessionId, orderNumber, items) {
+  const total = items.reduce((n, i) => n + i.price * i.quantity, 0);
+  const res = await fetch(`${server.base}/collect`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${INGEST_KEY}` },
+    body: JSON.stringify({
+      site: 'shop',
+      anonymousId: 'basket00-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+      sessionId,
+      events: [
+        {
+          type: 'order_submit',
+          orderNumber,
+          total: { centAmount: total, currencyCode: 'USD' },
+          itemCount: items.length,
+          items: items.map((i) => ({
+            product: { sku: i.sku, name: i.sku, price: { centAmount: i.price, currencyCode: 'USD' } },
+            quantity: i.quantity
+          })),
+          ts: new Date().toISOString()
+        }
+      ]
+    })
+  });
+  assert.equal(res.status, 202, await res.text());
+}
+
+test('products bought in the same order are paired, in both directions', async () => {
+  const before = await count('order_submit');
+
+  // Three baskets. The cable sells with both laptops; the sleeve with one.
+  await postOrder('bbbbbbbb-0001-4ccc-8ddd-eeeeeeeeeeee', 'B-1', [
+    { sku: 'LAPTOP', quantity: 1, price: 120000 },
+    { sku: 'CABLE', quantity: 2, price: 1500 }
+  ]);
+  await postOrder('bbbbbbbb-0002-4ccc-8ddd-eeeeeeeeeeee', 'B-2', [
+    { sku: 'LAPTOP', quantity: 1, price: 120000 },
+    { sku: 'CABLE', quantity: 1, price: 1500 },
+    { sku: 'SLEEVE', quantity: 1, price: 4000 }
+  ]);
+  await postOrder('bbbbbbbb-0003-4ccc-8ddd-eeeeeeeeeeee', 'B-3', [
+    { sku: 'CABLE', quantity: 1, price: 1500 }
+  ]);
+  await until(async () => (await count('order_submit')) === before + 3);
+
+  const result = await run('bought-together');
+  const pair = (x, y) =>
+    result.rows.find(
+      (r) => (r.sku_a === x && r.sku_b === y) || (r.sku_a === y && r.sku_b === x)
+    );
+
+  const laptopCable = pair('LAPTOP', 'CABLE');
+  assert.ok(laptopCable, 'the laptop and the cable are paired');
+  assert.equal(Number(laptopCable.pair_orders), 2, 'in the two orders holding both');
+
+  // Read from the laptop the cable attaches to everything; read from the
+  // cable the laptop does not. A single attach rate could not say that.
+  const fromLaptop = laptopCable.sku_a === 'LAPTOP' ? laptopCable.a_rate : laptopCable.b_rate;
+  const fromCable = laptopCable.sku_a === 'LAPTOP' ? laptopCable.b_rate : laptopCable.a_rate;
+  assert.equal(Math.round(Number(fromLaptop)), 100, 'every laptop order carried a cable');
+  assert.equal(Math.round(Number(fromCable)), 67, 'two of the three cable orders carried a laptop');
+
+  // The pair's own lines in the shared orders, not those orders' totals:
+  // two laptops and three cables.
+  assert.equal(Number(laptopCable.revenue), 2 * 120000 + 3 * 1500);
+
+  // Lift against chance. Of the four order baskets recorded, the laptop is in
+  // two and the cable in three, so chance alone would pair them in 2/4 × 3/4.
+  const baskets = before + 3;
+  assert.equal(
+    Number(laptopCable.lift).toFixed(4),
+    ((2 * baskets) / (2 * 3)).toFixed(4)
+  );
+
+  assert.ok(!result.rows.some((r) => r.sku_a === r.sku_b), 'nothing pairs with itself');
+  assert.ok(pair('LAPTOP', 'SLEEVE'), 'a pair seen once is still listed');
+  assert.equal(pair('CABLE', 'LAPTOP'), laptopCable, 'and each pair appears exactly once');
+});
+
+test('every table in the admin sorts by its headers', async () => {
+  // The headers become buttons in the browser, so what the server has to get
+  // right is the script and the raw values the sort reads back — formatted
+  // money, percentages and dates do not compare as themselves.
+  for (const key of ['products', 'bought-together', 'funnel', 'orders']) {
+    const html = await (
+      await fetch(`${server.base}/report/${key}?token=${ADMIN_TOKEN}&range=all`)
+    ).text();
+    assert.match(html, /aria-sort/, `${key} ships the sorting script`);
+    assert.match(html, /data-sort="/, `${key} carries raw values to sort on`);
+  }
+
+  const orders = await (
+    await fetch(`${server.base}/report/orders?token=${ADMIN_TOKEN}&range=all`)
+  ).text();
+  // Order B-1: one laptop and two cables, $1,230.00 on the page.
+  assert.match(orders, /data-sort="123000"/, 'a money cell sorts on its minor units');
+  assert.ok(orders.includes('$1,230.00'), 'and still reads as money');
+});
+
+test('the sorting script is the only script the policy will run', async () => {
+  // The admin's policy is default-src 'none'. The sorting script is allowed
+  // by the hash of its own source, so an edit to the script that did not
+  // reach the header would leave every table unsortable in a real browser —
+  // which no assertion on the markup would catch.
+  const res = await fetch(`${server.base}/report/products?token=${ADMIN_TOKEN}&range=all`);
+  const csp = res.headers.get('content-security-policy');
+  const inline = /<script>([\s\S]*?)<\/script>/.exec(await res.text());
+
+  assert.ok(inline, 'the page carries an inline script');
+  const digest = createHash('sha256').update(inline[1], 'utf8').digest('base64');
+  assert.ok(csp.includes(`'sha256-${digest}'`), 'and the policy names that exact script');
+
+  assert.match(csp, /default-src 'none'/, 'everything else is still refused');
+  assert.doesNotMatch(csp, /script-src[^;]*unsafe-inline/, 'no blanket inline execution');
 });

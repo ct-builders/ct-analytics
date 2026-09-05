@@ -8,9 +8,10 @@
  * The admin's HTML.
  *
  * Server-rendered strings, no client framework and no build step — the same
- * reason the browser client is one plain file. The CSS is inlined because the
- * whole admin is one stylesheet's worth and a second request for it would be
- * the only asset on the page.
+ * reason the browser client is one plain file. The stylesheet and the sorting
+ * script are inlined because together they are the whole of the admin's
+ * assets, and fetching them separately would be the only two requests the
+ * page makes beyond itself.
  *
  * Everything interpolated goes through `esc`. Report values originate in a
  * browser payload, which makes every cell untrusted input.
@@ -19,6 +20,7 @@
 import { esc } from './http.js';
 import { REPORTS } from './reports.js';
 import { RANGES, DEVICES, IDENTITY, toQuery, describe } from './filters.js';
+import { SORT_SCRIPT } from './sort-script.js';
 
 /* ---------------------------------------------------------------- formatting */
 
@@ -95,6 +97,31 @@ function cell(value, column, ctx) {
   }
 }
 
+/**
+ * What a cell sorts by, when its rendered text would not sort as itself.
+ *
+ * `$1,234.56`, `2m 4s` and `2026-09-01 10:14:02Z` all read well and compare
+ * badly, so the raw value travels with the cell as `data-sort` and the
+ * client-side sort prefers it over the text.
+ */
+function sortValue(value, column) {
+  if (value === null || value === undefined || value === '') return null;
+  switch (column.type) {
+    case 'money':
+    case 'number':
+    case 'percent': {
+      const n = Number(value);
+      return Number.isFinite(n) ? String(n) : null;
+    }
+    case 'date': {
+      const d = value instanceof Date ? value : new Date(value);
+      return Number.isNaN(d.getTime()) ? null : String(d.getTime());
+    }
+    default:
+      return null;
+  }
+}
+
 /* -------------------------------------------------------------------- layout */
 
 const CSS = `
@@ -160,6 +187,19 @@ th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--bor
 th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); background: var(--panel); position: sticky; top: 0; }
 td.num, th.num { text-align: right; }
 tbody tr:hover { background: var(--accent-soft); }
+th.sortable { padding: 0; }
+th.sortable > button {
+  font: inherit; color: inherit; letter-spacing: inherit; text-transform: inherit;
+  background: none; border: 0; margin: 0; width: 100%; padding: 6px 10px;
+  display: flex; align-items: center; gap: 5px; cursor: pointer;
+}
+th.sortable.num > button { flex-direction: row-reverse; }
+th.sortable > button::after { content: "↕"; font-size: 10px; opacity: 0.4; }
+th.sortable > button:hover { color: var(--text); }
+th.sortable > button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+th[aria-sort="ascending"], th[aria-sort="descending"] { color: var(--accent); }
+th[aria-sort="ascending"] > button::after { content: "↑"; opacity: 1; }
+th[aria-sort="descending"] > button::after { content: "↓"; opacity: 1; }
 .pill { display: inline-block; font-size: 11px; padding: 1px 8px; border: 1px solid var(--border); border-radius: 999px; background: #fff; }
 .empty { color: var(--muted); border: 1px dashed var(--border); border-radius: 6px; padding: 24px; text-align: center; }
 .empty b { color: var(--text); }
@@ -216,7 +256,9 @@ export function layout({ title, activeKey, filters, body }) {
   <a href="/install${tail}">Install</a>
 </nav>
 <main>${body}</main>
-</div></body></html>`;
+</div>
+<script>${SORT_SCRIPT}</script>
+</body></html>`;
 }
 
 /** The segment filter bar. Present on every report, so it is built once. */
@@ -310,12 +352,12 @@ export function funnelChart(result) {
     .map(
       (s) => `<tr>
       <td><b>${esc(s.label)}</b></td>
-      <td class="num">${esc(formatNumber(s.count))}</td>
-      <td class="num">${esc(formatPercent(s.ofTotal))}</td>
-      <td class="num">${esc(formatPercent(s.ofPrevious))}${
+      <td class="num" data-sort="${esc(String(s.count))}">${esc(formatNumber(s.count))}</td>
+      <td class="num" data-sort="${esc(String(s.ofTotal))}">${esc(formatPercent(s.ofTotal))}</td>
+      <td class="num" data-sort="${esc(String(s.ofPrevious))}">${esc(formatPercent(s.ofPrevious))}${
         s.dropped ? ` <span class="drop">−${esc(formatNumber(s.dropped))}</span>` : ''
       }</td>
-      <td><div class="bar"><div class="bar-fill" style="width:${Math.max(s.ofTotal, 0.5).toFixed(2)}%"></div>
+      <td data-sort="${esc(String(s.ofTotal))}"><div class="bar"><div class="bar-fill" style="width:${Math.max(s.ofTotal, 0.5).toFixed(2)}%"></div>
         <span>${esc(formatNumber(s.count))}</span></div></td>
     </tr>`
     )
@@ -343,14 +385,20 @@ export function dataTable(report, result, filters) {
     .map(
       (row) =>
         `<tr>${report.columns
-          .map((c) => `<td${NUMERIC.has(c.type) ? ' class="num"' : ''}>${cell(row[c.key], c, ctx)}</td>`)
+          .map((c) => {
+            const sort = sortValue(row[c.key], c);
+            return `<td${NUMERIC.has(c.type) ? ' class="num"' : ''}${
+              sort === null ? '' : ` data-sort="${esc(sort)}"`
+            }>${cell(row[c.key], c, ctx)}</td>`;
+          })
           .join('')}</tr>`
     )
     .join('')}</tbody></table></div>
   ${result.note ? `<p class="note">${esc(result.note)}</p>` : ''}
   ${
     result.rows.length >= filters.limit
-      ? `<p class="note">Showing the first ${esc(formatNumber(filters.limit))} rows — raise <b>Rows</b> to see more.</p>`
+      ? `<p class="note">Showing the first ${esc(formatNumber(filters.limit))} rows in the report's own order —
+         raise <b>Rows</b> to see more. Sorting by a column reorders these rows, not the rows beyond them.</p>`
       : ''
   }`;
 }

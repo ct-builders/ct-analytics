@@ -7,6 +7,7 @@
 /** Small helpers over node:http, so the server needs no web framework. */
 
 import { MAX_BODY_BYTES } from '../../../packages/shared/wire.js';
+import { SORT_SCRIPT_CSP_HASH } from './sort-script.js';
 
 /**
  * An Error carrying the HTTP status it should become.
@@ -48,8 +49,12 @@ export function html(res, status, markup, headers = {}) {
     'Content-Type': 'text/html; charset=utf-8',
     // The admin renders values that originate in a browser payload, so a
     // strict policy is worth having even though everything is escaped.
+    // `script-src` names the admin's own table-sorting script by hash rather
+    // than opening inline execution, so a payload that smuggles a script tag
+    // past the escaping still cannot run it.
     'Content-Security-Policy':
-      "default-src 'none'; style-src 'unsafe-inline'; img-src data:; form-action 'self'",
+      `default-src 'none'; script-src ${SORT_SCRIPT_CSP_HASH}; style-src 'unsafe-inline'; ` +
+      "img-src data:; form-action 'self'",
     'X-Content-Type-Options': 'nosniff',
     'Referrer-Policy': 'no-referrer',
     ...headers
