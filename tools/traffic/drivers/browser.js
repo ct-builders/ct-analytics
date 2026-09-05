@@ -42,7 +42,17 @@ const DWELL = {
 
 export async function createBrowserDriver({ profile, opts }) {
   const base = opts.target.replace(/\/+$/, '');
-  const browser = await chromium.launch({ headless: !opts.headed });
+  const browser = await chromium.launch({
+    headless: !opts.headed,
+    // Playwright closes the browser and ends the process on an interrupt by
+    // default, which takes the sessions in flight with it. A standing run is
+    // stopped with Ctrl-C as a matter of course, and its log is the ground
+    // truth the accuracy check reads — so a visit cut off mid-way reads as
+    // lost tracking. The run's own drain owns shutdown instead.
+    handleSIGINT: false,
+    handleSIGTERM: false,
+    handleSIGHUP: false
+  });
 
   return {
     async run(session) {
