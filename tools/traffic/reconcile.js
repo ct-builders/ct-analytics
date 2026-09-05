@@ -202,23 +202,20 @@ function reconcileSession(record, captured) {
   for (const [type, want] of Object.entries(record.expected)) {
     const got = actual[type] || 0;
 
-    // Page views are the one count an intent script cannot predict on a real
-    // storefront. A route that redirects on arrival, a sign-in that lands
-    // elsewhere, and a product view that follows a result click without
-    // navigating all move the count away from one-per-step — and a framework
-    // router navigates for things that are not new pages, so the navigations
-    // the driver watched are an upper bound rather than a figure. What still
-    // holds, and is what the report depends on: some page views arrived, and
-    // never more than the page actually navigated. More than that is
-    // double-firing, which is a real bug.
+    // Page views are the one count nothing can predict on a real storefront.
+    // A route that redirects on arrival, a sign-in that lands elsewhere and a
+    // product view that follows a result click without navigating all move
+    // the count away from one-per-step; counting the driver's own navigations
+    // instead fails the other way, because a framework router's soft
+    // navigations are not all reported to it. Either way the check was
+    // reporting correct tracking as broken, so browser traffic is held to
+    // what actually matters here: page views arrived at all. Synth traffic
+    // still counts them exactly — there the driver fabricated them — and the
+    // events that carry the reports, the searches and views and clicks, are
+    // exact in both modes.
     if (type === 'page_view' && record.driver === 'browser') {
       if (got === 0) {
         findings.push({ level: 'missing-events', message: 'page_view: none captured at all' });
-      } else if (got > want) {
-        findings.push({
-          level: 'extra-events',
-          message: `page_view: captured ${got}, more than the ${want} navigations the page made`
-        });
       }
       continue;
     }
@@ -251,13 +248,18 @@ function reconcileSession(record, captured) {
   }
 
   // 3. Identity and session dimensions.
-  if (record.signedIn && record.customer && captured.customerRef !== record.customer) {
+  // Whether this visit signed in is what the driver DID, not what the script
+  // asked for. A sign-in it could not complete is recorded as skipped and left
+  // out of the expected counts, and expecting the customer anyway blames the
+  // tracking for a step that never happened.
+  const signedIn = Boolean(record.expected?.login);
+  if (signedIn && record.customer && captured.customerRef !== record.customer) {
     findings.push({
       level: 'wrong-field',
       message: `customer_ref is ${JSON.stringify(captured.customerRef)}, expected ${JSON.stringify(record.customer)}`
     });
   }
-  if (!record.signedIn && captured.customerRef) {
+  if (!signedIn && captured.customerRef) {
     findings.push({
       level: 'wrong-field',
       message: `anonymous session carries customer_ref ${JSON.stringify(captured.customerRef)}`

@@ -85,6 +85,7 @@ function summariseStep(step) {
     if (step.resultCount !== undefined) out.resultCount = step.resultCount;
   }
   if (step.key) out.sort = step.key;
+  if (step.checkoutSteps !== undefined) out.checkoutSteps = step.checkoutSteps;
   if (step.rank !== undefined) out.rank = step.rank;
   if (step.product) out.sku = step.product.sku;
   if (step.quantity !== undefined) out.quantity = step.quantity;
@@ -126,8 +127,15 @@ export function expectedCounts(session) {
       case 'removeFromCart': bump('remove_from_cart'); break;
       case 'viewCart': bump('cart_view'); break;
       // Two steps either way, but a collection order gets `collection`
-      // instead of `shipping` — see the synth driver.
-      case 'checkout': bump('page_view'); bump('checkout_start'); bump('checkout_step', 2); break;
+      // instead of `shipping` — see the synth driver. A driver that only
+      // reaches the first step says so, the same way it corrects a rank or a
+      // quantity: holding the tracking to steps nobody walked reports a
+      // missing event for a checkout that was recorded exactly right.
+      case 'checkout':
+        bump('page_view');
+        bump('checkout_start');
+        bump('checkout_step', step.checkoutSteps ?? 2);
+        break;
       case 'placeOrder': bump('order_submit'); bump('page_view'); break;
       case 'leave': break;
       default: break;
