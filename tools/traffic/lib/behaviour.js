@@ -112,14 +112,28 @@ function chooseFulfillment(rand, profile) {
  * @param {{ anonymousId: string, customer?: { id: string, email: string, password?: string } }} opts.shopper
  * @param {Date} opts.startedAt
  * @param {import('./personas.js').Persona} [opts.persona]
+ * @param {{ id: string, email: string, password?: string }[]} [opts.customers]
  */
-export function buildSession({ rand, profile, shopper, startedAt, persona }) {
+export function buildSession({ rand, profile, shopper, startedAt, persona, customers = [] }) {
   const p = persona ?? pickPersona(rand);
   /** @type {any[]} */
   const steps = [];
   const say = (t, extra = {}) => steps.push({ t, ...extra });
 
-  const signedIn = Boolean(shopper.customer) && chance(rand, p.signedIn);
+  const wantsSignIn = chance(rand, p.signedIn);
+  // A persona whose defining trait is being signed in has to be able to sign
+  // in. Only about a third of browsers carry a customer, so a small pool
+  // frequently has none at all — four browsers come up empty roughly one run
+  // in five — and every returning-customer session then goes quietly
+  // anonymous, leaving sign-in tracking unexercised.
+  //
+  // Assigned here rather than at pool-build time so the browser-to-person
+  // binding holds: once this browser is someone, it stays that person across
+  // its later visits.
+  if (wantsSignIn && !shopper.customer && customers.length) {
+    shopper.customer = pick(rand, customers);
+  }
+  const signedIn = wantsSignIn && Boolean(shopper.customer);
 
   say('land', { path: '/' });
   if (signedIn) say('login', { customer: shopper.customer });

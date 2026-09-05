@@ -191,7 +191,7 @@ async function main() {
     const startedAt = opts.mode === 'browser' || opts.loop
       ? new Date()
       : sessionStartedAt(rand, { now, days: opts.days });
-    const session = buildSession({ rand, profile, shopper, startedAt });
+    const session = buildSession({ rand, profile, shopper, startedAt, customers });
     session.seed = (opts.seed + index_seed(i)) >>> 0;
     return session;
   }
@@ -380,7 +380,7 @@ function dryRun(profile, rand, customers) {
   }
   say('');
   const shopper = buildShopperPool({ rand, sessions: 10, customers, newId: () => randomUUID() })[0];
-  const sample = buildSession({ rand, profile, shopper, startedAt: new Date() });
+  const sample = buildSession({ rand, profile, shopper, startedAt: new Date(), customers });
   say(`sample session (persona: ${sample.persona}, signedIn: ${sample.signedIn}):`);
   for (const step of sample.steps) {
     const detail = [step.term, step.slug, step.product?.sku, step.rank && `rank ${step.rank}`,
