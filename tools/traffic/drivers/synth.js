@@ -86,6 +86,9 @@ export function synthesize(session, { profile, rand }) {
   let discovery = null;
   const pinned = new Map();
 
+  /** What the cart holds so far, in minor units. */
+  let cartCents = 0;
+
   const path = (key, vars) =>
     (profile.paths[key] || '/').replace(/\{(\w+)\}/g, (_, n) => String(vars?.[n] ?? ''));
 
@@ -223,12 +226,16 @@ export function synthesize(session, { profile, rand }) {
 
       case 'addToCart': {
         const attribution = pinned.get(step.product.sku) ?? snapshot();
+        // The cart total is what the cart now holds, not what this line cost.
+        // With a second line in the basket the two stop being the same number,
+        // and a storefront reports the running total.
+        cartCents += (step.product.priceCents ?? 0) * step.quantity;
         emit(
           {
             type: 'add_to_cart',
             product: productRef(step.product, currency),
             quantity: step.quantity,
-            cartTotal: { centAmount: (step.product.priceCents ?? 0) * step.quantity, currencyCode: currency },
+            cartTotal: { centAmount: cartCents, currencyCode: currency },
             ...omni(step)
           },
           { attribution }
@@ -237,12 +244,13 @@ export function synthesize(session, { profile, rand }) {
       }
 
       case 'removeFromCart':
+        cartCents = Math.max(0, cartCents - (step.product.priceCents ?? 0) * step.quantity);
         emit(
           {
             type: 'remove_from_cart',
             product: productRef(step.product, currency),
             quantity: step.quantity,
-            cartTotal: { centAmount: 0, currencyCode: currency },
+            cartTotal: { centAmount: cartCents, currencyCode: currency },
             ...omni(step)
           },
           { attribution: pinned.get(step.product.sku) ?? snapshot() }

@@ -41,7 +41,8 @@
  *   removeFromCart: number,
  *   reachCheckout: number,
  *   completeOrder: number,
- *   multiUnitRate: number
+ *   multiUnitRate: number,
+ *   secondLine: number
  * }} Persona */
 
 /** @type {Persona[]} */
@@ -63,7 +64,8 @@ export const PERSONAS = [
     removeFromCart: 0,
     reachCheckout: 0,
     completeOrder: 0,
-    multiUnitRate: 0
+    multiUnitRate: 0,
+    secondLine: 0
   },
   {
     key: 'browser',
@@ -80,7 +82,8 @@ export const PERSONAS = [
     removeFromCart: 0.4,
     reachCheckout: 0.1,
     completeOrder: 0.2,
-    multiUnitRate: 0.1
+    multiUnitRate: 0.1,
+    secondLine: 0.25
   },
   {
     key: 'researcher',
@@ -99,7 +102,10 @@ export const PERSONAS = [
     removeFromCart: 0.35,
     reachCheckout: 0.35,
     completeOrder: 0.45,
-    multiUnitRate: 0.15
+    multiUnitRate: 0.15,
+    // Comparing carefully and then buying two of what was compared is the
+    // most ordinary way a basket ends up with more than one line in it.
+    secondLine: 0.45
   },
   {
     key: 'intent-buyer',
@@ -116,7 +122,8 @@ export const PERSONAS = [
     removeFromCart: 0.1,
     reachCheckout: 0.9,
     completeOrder: 0.8,
-    multiUnitRate: 0.25
+    multiUnitRate: 0.25,
+    secondLine: 0.5
   },
   {
     key: 'returning-customer',
@@ -136,7 +143,9 @@ export const PERSONAS = [
     removeFromCart: 0.2,
     reachCheckout: 0.7,
     completeOrder: 0.72,
-    multiUnitRate: 0.35
+    multiUnitRate: 0.35,
+    // Knows the catalog, so carries the largest baskets on the site.
+    secondLine: 0.6
   }
 ];
 
