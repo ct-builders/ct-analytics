@@ -67,6 +67,22 @@ export async function createBrowserDriver({ profile, opts }) {
       page.setDefaultTimeout(ACTION_TIMEOUT);
       page.setDefaultNavigationTimeout(NAV_TIMEOUT);
 
+      /**
+       * Every main-frame URL the session landed on.
+       *
+       * Page views are then counted from what happened rather than predicted
+       * from the script, which the script cannot do: a route that redirects
+       * on arrival, a sign-in that lands somewhere else, and a product view
+       * that follows a result click on the same page all move the real count
+       * away from one-per-step. Predicting it reported three extra page views
+       * a session, every session, for navigation the storefront was right to
+       * perform.
+       */
+      const visited = [];
+      page.on('framenavigated', (frame) => {
+        if (frame === page.mainFrame()) visited.push(frame.url());
+      });
+
       /** Every POST the page made to its ingest path, so delivery is provable. */
       const posts = [];
       page.on('response', (res) => {
@@ -78,13 +94,19 @@ export async function createBrowserDriver({ profile, opts }) {
 
       const performed = [];
       const skipped = [];
+      /** What the last result click actually landed on, so the product view that follows inherits it. */
+      const lastClick = {};
 
       try {
-        await passGate(page, base, profile, session);
+        // Loud, not silent: a gate that will not open makes every event in
+        // the session meaningless, so it fails the session rather than
+        // producing a visit that looks tracked and is not.
+        const gatePath = await passGate(page, base, profile, session);
+        if (gatePath === null) throw new Error('could not get past the site gate');
 
         for (const step of session.steps) {
           try {
-            const did = await perform(page, base, profile, step, session);
+            const did = await perform(page, base, profile, step, session, lastClick);
             if (did === true) performed.push(step);
             // A skip says WHY. "Not applicable" covers an expected skip and a
             // selector that has broken with the same three words, and the
@@ -121,6 +143,10 @@ export async function createBrowserDriver({ profile, opts }) {
           sessionId,
           performed,
           skipped,
+          // The gate's own pages are not part of the shopper's visit, and the
+          // gate is served without the tracking client, so counting them
+          // would expect page views that were never fired.
+          navigations: visited.filter((url) => !gatePath || pathnameOf(url) !== gatePath).length,
           accepted: posts.filter((p) => p.status === 202).length,
           rejected: posts.filter((p) => p.status >= 400).map((p) => ({ status: p.status })),
           requests: posts.length
@@ -145,20 +171,36 @@ export async function createBrowserDriver({ profile, opts }) {
  * logged in.
  */
 async function passGate(page, base, profile, session) {
-  await page.goto(base + pathFor(profile, 'home'), { waitUntil: 'domcontentloaded' });
+  const home = base + pathFor(profile, 'home');
+  await page.goto(home, { waitUntil: 'domcontentloaded' });
+  let gatePath = '';
 
-  const email = page.locator(profile.selectors.gateEmail).first();
-  if (!(await email.count())) return;
-  if (!(await email.isVisible().catch(() => false))) return;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const email = page.locator(profile.selectors.gateEmail).first();
+    if (!(await email.count())) return gatePath;
+    if (!(await email.isVisible().catch(() => false))) return gatePath;
+    gatePath = pathnameOf(page.url());
 
-  await fillField(page, email, session.customer?.email || 'traffic@example.com');
-  const password = page.locator('input[type=password]').first();
-  if ((await password.count()) && (await password.isVisible().catch(() => false))) {
-    const secret = process.env.CLICKSTREAM_TARGET_GATE_PASSWORD || '';
-    if (secret) await fillField(page, password, secret);
+    await fillField(page, email, session.customer?.email || 'traffic@example.com');
+    const password = page.locator('input[type=password]').first();
+    if ((await password.count()) && (await password.isVisible().catch(() => false))) {
+      const secret = process.env.CLICKSTREAM_TARGET_GATE_PASSWORD || '';
+      if (secret) await fillField(page, password, secret);
+    }
+    await submitForm(page, email, profile.selectors.gateSubmit);
+    await page.waitForLoadState('domcontentloaded').catch(() => {});
+    await page.waitForTimeout(900 + attempt * 700);
+
+    // Getting in is the only reliable check. A form whose framework is not
+    // live yet posts NOTHING when submitted — no request, no error, the page
+    // simply comes back — and the gate answers every content URL with a
+    // redirect to itself, so the session then walks the gate page start to
+    // finish: every step "performed", nothing tracked, indistinguishable from
+    // total tracking loss.
+    if (!(await page.locator(profile.selectors.gateEmail).first().count())) return gatePath;
+    await page.goto(home, { waitUntil: 'domcontentloaded' }).catch(() => {});
   }
-  await submitForm(page, email, profile.selectors.gateSubmit);
-  await page.waitForLoadState('domcontentloaded').catch(() => {});
+  return null;
 }
 
 /**
@@ -255,7 +297,7 @@ async function go(page, url) {
  * reason it could not be — which goes in the log, so a broken selector reads
  * differently from a facet that was never on this listing.
  */
-async function perform(page, base, profile, step, session) {
+async function perform(page, base, profile, step, session, lastClick = {}) {
   const sel = profile.selectors;
   const dwell = async (kind) => {
     const [lo, hi] = DWELL[kind] || DWELL.default;
@@ -301,9 +343,18 @@ async function perform(page, base, profile, step, session) {
     }
 
     case 'logout': {
-      const out = page.locator(SIGN_OUT).first();
-      if (!(await out.count())) return 'no sign-out control on the page';
-      await out.click();
+      let out = page.locator(SIGN_OUT).first();
+      // Storefronts tuck sign-out inside an account menu, so the control is in
+      // the DOM and not clickable — and a click on it times out, which is why
+      // this step never verified against a real page. The account page carries
+      // the same control in the open.
+      if (!(await out.isVisible().catch(() => false)) && profile.paths.account) {
+        await go(page, base + pathFor(profile, 'account'));
+        out = page.locator(SIGN_OUT).first();
+        await out.waitFor({ state: 'visible', timeout: 8000 }).catch(() => {});
+      }
+      if (!(await out.isVisible().catch(() => false))) return 'sign-out control is not reachable';
+      await out.click({ force: true });
       await page.waitForLoadState('domcontentloaded').catch(() => {});
       return true;
     }
@@ -321,6 +372,7 @@ async function perform(page, base, profile, step, session) {
     case 'applyFacet':
     case 'removeFacet': {
       const chip = page.locator(sel.facetChip.replace('{value}', step.value)).first();
+      await chip.waitFor({ state: 'attached', timeout: 3000 }).catch(() => {});
       if (!(await chip.count())) return `no facet control for ${step.name}=${step.value}`;
       await chip.click();
       await page.waitForLoadState('domcontentloaded').catch(() => {});
@@ -330,6 +382,7 @@ async function perform(page, base, profile, step, session) {
 
     case 'sort': {
       const select = page.locator(sel.sortSelect).first();
+      await select.waitFor({ state: 'attached', timeout: 3000 }).catch(() => {});
       if (!(await select.count())) return 'no sort control on this listing';
       await select.selectOption({ index: 1 }).catch(() => {});
       await dwell('default');
@@ -349,8 +402,13 @@ async function perform(page, base, profile, step, session) {
         await page.goBack({ waitUntil: 'domcontentloaded' }).catch(() => {});
       }
       const cards = page.locator(sel.resultCard);
+      // Listings render on the client, so counting straight after
+      // domcontentloaded finds nothing and calls a perfectly good listing
+      // empty — costing the result click, the product view, and every
+      // attribution field that hangs off them.
+      await cards.first().waitFor({ state: 'attached', timeout: 8000 }).catch(() => {});
       const count = await cards.count();
-      if (!count) return 'no result cards on the listing';
+      if (!count) return `no result cards at ${pathAndQuery(page)}`;
       // The rank the script asked for, or the last card if the real listing is
       // shorter than the profile's product list.
       const index = Math.min(step.rank - 1, count - 1);
@@ -371,6 +429,12 @@ async function perform(page, base, profile, step, session) {
         step.product = { ...step.product, sku: decodeURIComponent(observedSku) };
       }
       step.rank = index + 1;
+      // The product view that follows is a separate step carrying the same
+      // prediction this one just corrected. Correcting only half of the pair
+      // reports attribution as lost — captured position 1, "expected" the
+      // profile's guess of 2 — for tracking that recorded the click exactly.
+      lastClick.sku = step.product?.sku;
+      lastClick.rank = step.rank;
 
       await card.click({ force: true });
       await page.waitForLoadState('domcontentloaded').catch(() => {});
@@ -387,6 +451,7 @@ async function perform(page, base, profile, step, session) {
         // prediction.
         const sku = /\/p\/([^/?#]+)/.exec(page.url())?.[1];
         if (sku) step.product = { ...step.product, sku: decodeURIComponent(sku) };
+        if (lastClick.sku && lastClick.sku === step.product?.sku) step.rank = lastClick.rank;
         return true;
       }
       await go(
@@ -399,7 +464,8 @@ async function perform(page, base, profile, step, session) {
 
     case 'addToCart': {
       const button = page.locator(sel.addToCart).first();
-      if (!(await button.count())) return 'no add-to-cart control on the page';
+      await button.waitFor({ state: 'attached', timeout: 8000 }).catch(() => {});
+      if (!(await button.count())) return `no add-to-cart control at ${pathAndQuery(page)}`;
       await button.scrollIntoViewIfNeeded().catch(() => {});
 
       // The product added is whatever is on THIS page, not the one the
@@ -448,6 +514,24 @@ async function perform(page, base, profile, step, session) {
 
     default:
       return `no driver support for step "${step.t}"`;
+  }
+}
+
+function pathnameOf(url) {
+  try {
+    return new URL(url).pathname;
+  } catch {
+    return url;
+  }
+}
+
+/** Where a skip happened. A reason without the page is half a diagnosis. */
+function pathAndQuery(page) {
+  try {
+    const url = new URL(page.url());
+    return url.pathname + url.search;
+  } catch {
+    return page.url();
   }
 }
 
