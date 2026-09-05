@@ -281,6 +281,16 @@ async function perform(page, base, profile, step, session) {
       const button = page.locator(sel.addToCart).first();
       if (!(await button.count())) return false;
       await button.scrollIntoViewIfNeeded().catch(() => {});
+
+      // The product added is whatever is on THIS page, not the one the
+      // script predicted from the profile's list — a search that landed on
+      // a different product (the live catalog no longer matches the
+      // profile's static order) still adds the product actually shown.
+      // Same correction clickResult/viewProduct already apply, so the
+      // reconciler is held to what happened rather than what was guessed.
+      const sku = /\/p\/([^/?#]+)/.exec(page.url())?.[1];
+      if (sku) step.product = { ...step.product, sku: decodeURIComponent(sku) };
+
       // Sticky headers and cart drawers overlap controls on a narrow
       // viewport; the intent is the click, not the hit-test.
       await button.click({ force: true });

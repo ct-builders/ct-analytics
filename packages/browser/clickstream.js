@@ -616,6 +616,11 @@
           headers: { 'Content-Type': 'application/json' },
           body: body,
           keepalive: true
+        }).then(function (res) {
+          // fetch() only rejects on a network-level failure; a 4xx/5xx
+          // response resolves normally and would otherwise log as "sent"
+          // while the collector silently discarded the batch.
+          if (!res.ok) log('send rejected (' + res.status + '); batch dropped');
         })['catch'](function () { log('send failed; batch dropped'); });
       } else {
         var xhr = new XMLHttpRequest();
