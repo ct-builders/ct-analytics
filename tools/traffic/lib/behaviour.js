@@ -147,6 +147,8 @@ export function buildSession({ rand, profile, shopper, startedAt, persona, custo
 
   /** Products this session has actually seen, so later steps refer to real ones. */
   const seen = [];
+  /** Products that were on a listing this session engaged with, opened or not. */
+  const nearby = [];
   const searchCount = between(rand, p.searchesPerSession);
 
   if (mode === 'search' || (mode === 'category' && searchCount > 0 && chance(rand, 0.3))) {
@@ -172,6 +174,11 @@ export function buildSession({ rand, profile, shopper, startedAt, persona, custo
     const product = pick(rand, profile.products);
     say('viewProduct', { product, direct: true });
     seen.push(product);
+    // A shopper who arrived straight at a product still has the rest of its
+    // category in front of them, as related products. Without this, a direct
+    // session could never reach a second line at all.
+    const home = profile.categories.find((c) => c.products?.some((x) => x.sku === product.sku));
+    if (home) for (const x of home.products) if (!nearby.includes(x)) nearby.push(x);
   }
 
   if (!seen.length) { say('leave', { reason: 'nothing viewed' }); return finish(); }
@@ -182,6 +189,8 @@ export function buildSession({ rand, profile, shopper, startedAt, persona, custo
 
   const quantity = chance(rand, p.multiUnitRate) ? between(rand, [2, 3]) : 1;
   const fulfil = chooseFulfillment(rand, profile);
+  /** What the basket holds, so checkout and the order report what was added. */
+  const cart = [{ product: chosen, quantity }];
   say('addToCart', { product: chosen, quantity, ...fulfil });
 
   if (chance(rand, p.removeFromCart)) {
@@ -191,15 +200,39 @@ export function buildSession({ rand, profile, shopper, startedAt, persona, custo
     return finish();
   }
 
+  // A second line, taken from what this shopper actually looked at.
+  //
+  // Real baskets hold more than one thing, and a generator that only ever
+  // ships one line leaves every basket question unanswerable no matter how
+  // much traffic it drives — Bought together reads nothing at all from a
+  // catalog of single-line orders. Drawing the companion from `seen` rather
+  // than from the whole catalog is what makes the resulting pairs mean
+  // something: they came out of one shopper's own session, so the affinities
+  // follow how the catalog is actually searched and browsed instead of being
+  // uniform noise that gives every pair the same lift.
+  // Another product they opened if there was one, otherwise something that
+  // sat next to it on the listing — the shopper who came for one thing and
+  // added the item beside it, which is most of how a second line happens.
+  const candidates = seen.filter((x) => x.sku !== chosen.sku);
+  const pool = candidates.length ? candidates : nearby.filter((x) => x.sku !== chosen.sku);
+  if (pool.length && chance(rand, p.secondLine)) {
+    const companion = pick(rand, pool);
+    // The browser driver adds whatever product page it is on, so the session
+    // has to walk back to the companion before it can add it.
+    say('viewProduct', { product: companion });
+    say('addToCart', { product: companion, quantity: 1, ...fulfil });
+    cart.push({ product: companion, quantity: 1 });
+  }
+
   say('viewCart');
 
   if (!chance(rand, p.reachCheckout)) { say('leave', { reason: 'abandoned cart' }); return finish(); }
 
-  say('checkout', { items: [{ product: chosen, quantity }], ...fulfil });
+  say('checkout', { items: cart, ...fulfil });
 
   if (!chance(rand, p.completeOrder)) { say('leave', { reason: 'abandoned checkout' }); return finish(); }
 
-  say('placeOrder', { items: [{ product: chosen, quantity }], ...fulfil });
+  say('placeOrder', { items: cart, ...fulfil });
   if (signedIn && chance(rand, 0.3)) say('logout', { customer: shopper.customer });
   say('leave', { reason: 'ordered' });
   return finish();
@@ -241,6 +274,10 @@ export function buildSession({ rand, profile, shopper, startedAt, persona, custo
       say('viewProduct', { product, rank });
       seen.push(product);
     }
+    // What was on the listing the shopper actually engaged with, whether or
+    // not they opened it. A companion picked from here is the product next to
+    // the one they bought, which is where a real add-on comes from.
+    for (const product of pool) if (!nearby.includes(product)) nearby.push(product);
   }
 
   function finish() {
