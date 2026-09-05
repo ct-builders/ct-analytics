@@ -288,6 +288,11 @@ async function main() {
           const expected = expectedCounts(
             outcome.performed ? { ...session, steps: outcome.performed } : session
           );
+          // A driver that watched the page knows how many page views happened;
+          // the script can only guess, and guesses wrong wherever the
+          // storefront redirects, lands a sign-in elsewhere, or renders a
+          // product view without navigating.
+          if (typeof outcome.navigations === 'number') expected.page_view = outcome.navigations;
           stats.sessions += 1;
           stats.events += outcome.accepted ?? 0;
           stats.rejected += outcome.rejected?.length ?? 0;

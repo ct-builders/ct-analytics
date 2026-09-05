@@ -17,6 +17,7 @@
     "cart": "/en-us/cart",
     "checkout": "/en-us/checkout",
     "login": "/en-us/login",
+    "account": "/en-us/account",
     "orderConfirmation": "/en-us/checkout/confirmation/{orderId}"
   },
   "selectors": {
