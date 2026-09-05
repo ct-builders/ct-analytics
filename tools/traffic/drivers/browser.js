@@ -228,6 +228,17 @@ async function perform(page, base, profile, step, session) {
     }
 
     case 'clickResult': {
+      // behaviour.js's browseListing() emits several clickResult+viewProduct
+      // pairs back to back from ONE listing, with no search/browseCategory step
+      // between them. The previous pair already navigated this page to a
+      // product detail page, so without returning to the listing first, this
+      // query would match whatever `a[href*='/p/']` links THAT page happens to
+      // carry — related products (rendered with no rank, so they never track a
+      // result_click) or recently-viewed cards (which track nothing at all) —
+      // instead of the next-ranked result the script actually asked for.
+      if (page.url().includes('/p/')) {
+        await page.goBack({ waitUntil: 'domcontentloaded' }).catch(() => {});
+      }
       const cards = page.locator(sel.resultCard);
       const count = await cards.count();
       if (!count) return false;
