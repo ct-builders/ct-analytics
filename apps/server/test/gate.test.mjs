@@ -43,7 +43,7 @@ before(async () => {
   upstream = createServer((req, res) => {
     if (req.url.startsWith('/site-info')) {
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ open: siteOpen, name: 'Journey Reports' }));
+      res.end(JSON.stringify({ open: siteOpen, name: 'Clickstream Reports' }));
       return;
     }
     if (req.url === '/auth' && req.method === 'POST') {
@@ -70,9 +70,9 @@ before(async () => {
   await new Promise((r) => upstream.listen(0, '127.0.0.1', r));
   upstreamBase = `http://127.0.0.1:${upstream.address().port}`;
 
-  process.env.GATE_SITE = 'journey-reports';
+  process.env.GATE_SITE = 'clickstream-reports';
   process.env.GATE_AUTH_URL = upstreamBase;
-  process.env.GATE_NAME = 'Journey Reports';
+  process.env.GATE_NAME = 'Clickstream Reports';
 
   server = await startServer();
 });
@@ -120,7 +120,7 @@ test('the gate page renders with a password field', async () => {
   assert.match(html, /Work email/);
   assert.match(html, /Site password/);
   assert.match(html, /name="password"/);
-  assert.match(html, /Journey Reports/, 'the site name comes from the auth service');
+  assert.match(html, /Clickstream Reports/, 'the site name comes from the auth service');
   assert.equal(res.headers.get('cache-control'), 'no-store');
 });
 
@@ -167,7 +167,7 @@ test('the right password opens the gate and sets a hardened cookie', async () =>
 
   // The submission reached the auth service with the registered site id.
   const last = authCalls[authCalls.length - 1];
-  assert.equal(last.site, 'journey-reports');
+  assert.equal(last.site, 'clickstream-reports');
   assert.equal(last.email, 'verify@example.com');
 });
 

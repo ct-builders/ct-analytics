@@ -18,7 +18,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 
 const exec = promisify(execFile);
-const name = process.env.PGDATABASE || 'journey';
+const name = process.env.PGDATABASE || 'clickstream';
 
 try {
   await exec('createdb', [name]);

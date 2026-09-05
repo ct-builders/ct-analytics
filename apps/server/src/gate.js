@@ -148,7 +148,7 @@ function gatePage({ open, error, name }) {
 <html lang="en"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${esc(name || 'Journey')} — access</title>
+<title>${esc(name || 'Commerce Clickstream')} — access</title>
 <style>
   :root { --border:#e2e5ea; --text:#1a1d21; --muted:#61666e; --accent:#0b6bcb; --bad:#b3261e; --panel:#f7f8fa; }
   * { box-sizing:border-box; }
@@ -167,7 +167,7 @@ function gatePage({ open, error, name }) {
 </style>
 </head><body>
 <form class="card" method="post" action="/gate">
-  <div class="brand">Journey<span>shopper analytics</span></div>
+  <div class="brand">Clickstream<span>shopper analytics</span></div>
   <h1>${esc(name || 'Reports')}</h1>
   <p class="sub">Enter your work email${open ? '' : ' and the site password'} to continue.</p>
   ${error ? '<p class="err">That did not work. Check the password and try again.</p>' : ''}
