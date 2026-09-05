@@ -297,7 +297,13 @@ test('the script alone classifies the page it loaded on', async () => {
   ];
 
   for (const [path, expected] of cases) {
-    const page = await loadPage({ path, config: { auto: true } });
+    // `autoSearchDelay` is squeezed on purpose. Left at its 800ms default, the
+    // `/search?q=merino` case schedules an automatic search that fires long
+    // after this page is torn down — and since the client resolves
+    // `window.fetch` dynamically (which is right, a real page has one
+    // window), that late request lands in whichever page is current by then.
+    // See the note in dom.mjs.
+    const page = await loadPage({ path, config: { auto: true, autoSearchDelay: 5 } });
     try {
       await settle();
       const view = page.byType('page_view')[0];

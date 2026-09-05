@@ -6,3 +6,7 @@ dist/
 .DS_Store
 coverage/
 *.log
+
+# Traffic-generator run artifacts. The action log is per-run ground
+# truth, not something to carry in the repo.
+tools/traffic/log/

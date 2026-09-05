@@ -153,5 +153,16 @@ export async function loadPage(opts = {}) {
   };
 }
 
-/** Let the queue's flush timer fire. */
+/**
+ * Let the queue's flush timer fire.
+ *
+ * A test must not leave a timer pending past `restore()`. The client reads
+ * `window.fetch` at call time rather than capturing it — correct, because a
+ * real page has exactly one window — so a late timer from a torn-down page
+ * posts into whichever page is current when it fires, and the failure surfaces
+ * as an unrelated test intermittently seeing one extra request.
+ *
+ * In practice that means any test enabling `auto` should also shorten
+ * `autoSearchDelay` (default 800ms) and settle afterwards.
+ */
 export const settle = () => new Promise((r) => setTimeout(r, 40));

@@ -1,0 +1,746 @@
+{
+  "id": "thegoodstore",
+  "label": "The Good Store",
+  "site": "thegoodstore",
+  "notes": "Home and furniture storefront. Set CLICKSTREAM_TARGET_URL to its base URL; nothing here hardcodes a hostname.",
+  "context": {
+    "store": "US",
+    "channel": "web",
+    "locale": "en-US",
+    "currency": "USD"
+  },
+  "paths": {
+    "home": "/en-us",
+    "search": "/en-us/search?q={term}",
+    "category": "/en-us/category/{slug}",
+    "product": "/en-us/{slug}/p/{sku}",
+    "cart": "/en-us/cart",
+    "checkout": "/en-us/checkout",
+    "login": "/en-us/login",
+    "orderConfirmation": "/en-us/checkout/confirmation/{orderId}"
+  },
+  "selectors": {
+    "gateEmail": "input[type=email]",
+    "gateSubmit": "form button[type=submit]",
+    "searchInput": "input[placeholder*='Search products']",
+    "searchSubmit": "button[aria-label='Submit search'], button[type=submit]",
+    "resultCard": "a[href*='/p/']",
+    "resultCount": "p:has-text('products')",
+    "facetChip": "button:has-text('{value}')",
+    "sortSelect": "select",
+    "addToCart": "button:has-text('Add to Cart')",
+    "cartLink": "button[aria-label*='Cart']",
+    "checkoutButton": "a[href*='/checkout'], button:has-text('Checkout')",
+    "loginEmail": "input[type=email]",
+    "loginPassword": "input[type=password]",
+    "loginSubmit": "button[type=submit]"
+  },
+  "facets": [
+    {
+      "name": "eco-claim",
+      "values": [
+        "fsc-oak",
+        "low-voc-finish",
+        "natural-latex",
+        "organic-cotton",
+        "reclaimed-ash",
+        "recycled-linen",
+        "recycled-steel",
+        "recycled-wool"
+      ]
+    }
+  ],
+  "sorts": [
+    "price-asc",
+    "price-desc",
+    "newest"
+  ],
+  "searchMisses": [
+    "cashmere throw",
+    "linen curtains",
+    "standing desk",
+    "bar cart",
+    "outdoor sofa",
+    "crib",
+    "wine fridge",
+    "recliner",
+    "bunk bed",
+    "chandelier"
+  ],
+  "categories": [
+    {
+      "slug": "sofas",
+      "name": "Sofas",
+      "productSkus": [
+        "MTSS-01",
+        "NTSS-01",
+        "CTSS-098",
+        "TLSS-01",
+        "CTSS-0983",
+        "TTSS-01"
+      ]
+    },
+    {
+      "slug": "beds",
+      "name": "Beds",
+      "productSkus": [
+        "SQB-034",
+        "MUTB-01",
+        "OTB-07",
+        "CQB-09",
+        "MTB-023",
+        "IQB-09",
+        "RCQB-01",
+        "MUQB-01"
+      ]
+    },
+    {
+      "slug": "living-room-tables",
+      "name": "Living Room Tables",
+      "productSkus": [
+        "ADCT-01",
+        "GMCT-01",
+        "WCSI-09",
+        "MMST-01",
+        "CNS-0434"
+      ]
+    },
+    {
+      "slug": "storage-and-tables",
+      "name": "Storage & tables",
+      "productSkus": [
+        "RCD-01",
+        "MGD-01",
+        "EWC-07",
+        "WCS-09",
+        "MB-0973"
+      ]
+    },
+    {
+      "slug": "kitchen",
+      "name": "Kitchen",
+      "productSkus": [
+        "GC-01",
+        "CCM-089",
+        "LCO-034",
+        "BAMB-084",
+        "SGB-01",
+        "WTP-09",
+        "BCOAS-08",
+        "CWG-01"
+      ]
+    },
+    {
+      "slug": "home-decor",
+      "name": "Home Decor",
+      "productSkus": [
+        "MPC-02",
+        "PAP-01",
+        "JAR-08",
+        "LPC-09",
+        "ARG-56",
+        "AMR-09",
+        "ADPC-09"
+      ]
+    }
+  ],
+  "searchTerms": [
+    {
+      "term": "sofa",
+      "productSkus": [
+        "MTSS-01",
+        "NTSS-01",
+        "CTSS-098",
+        "TLSS-01",
+        "CTSS-0983",
+        "TTSS-01"
+      ]
+    },
+    {
+      "term": "bed",
+      "productSkus": [
+        "SQB-034",
+        "MUTB-01",
+        "OTB-07",
+        "CQB-09",
+        "MTB-023",
+        "IQB-09",
+        "RCQB-01",
+        "MUQB-01"
+      ]
+    },
+    {
+      "term": "rug",
+      "productSkus": [
+        "JAR-08",
+        "ARG-56",
+        "AMR-09"
+      ]
+    },
+    {
+      "term": "coffee table",
+      "productSkus": [
+        "ADCT-01",
+        "GMCT-01"
+      ]
+    },
+    {
+      "term": "pillow",
+      "productSkus": [
+        "MPC-02",
+        "LPC-09",
+        "ADPC-09"
+      ]
+    },
+    {
+      "term": "dresser",
+      "productSkus": [
+        "RCD-01",
+        "MGD-01"
+      ]
+    },
+    {
+      "term": "coaster",
+      "productSkus": [
+        "LCO-034",
+        "BAMB-084",
+        "BCOAS-08"
+      ]
+    },
+    {
+      "term": "nightstand",
+      "productSkus": [
+        "CNS-0434"
+      ]
+    },
+    {
+      "term": "mug",
+      "productSkus": [
+        "CCM-089"
+      ]
+    },
+    {
+      "term": "wine glass",
+      "productSkus": [
+        "CWG-01"
+      ]
+    },
+    {
+      "term": "bookcase",
+      "productSkus": [
+        "MB-0973"
+      ]
+    },
+    {
+      "term": "cabinet",
+      "productSkus": [
+        "EWC-07",
+        "WCS-09"
+      ]
+    },
+    {
+      "term": "stool",
+      "productSkus": [
+        "WCSI-09"
+      ]
+    },
+    {
+      "term": "teapot",
+      "productSkus": [
+        "WTP-09"
+      ]
+    },
+    {
+      "term": "painting",
+      "productSkus": [
+        "PAP-01"
+      ]
+    },
+    {
+      "term": "queen bed",
+      "productSkus": [
+        "CQB-09",
+        "IQB-09",
+        "RCQB-01",
+        "MUQB-01"
+      ]
+    },
+    {
+      "term": "walnut",
+      "productSkus": [
+        "WCSI-09",
+        "WCS-09"
+      ]
+    }
+  ],
+  "products": [
+    {
+      "sku": "MTSS-01",
+      "slug": "modern-three-seater-sofa",
+      "name": "Modern Three Seater Sofa",
+      "priceCents": 249900,
+      "categoryPath": "sofas",
+      "attrs": {
+        "eco-claim": "recycled-linen"
+      }
+    },
+    {
+      "sku": "NTSS-01",
+      "slug": "nala-two-seater-sofa",
+      "name": "Nala Two Seater Sofa",
+      "priceCents": 129900,
+      "categoryPath": "sofas",
+      "attrs": {
+        "eco-claim": "reclaimed-ash"
+      }
+    },
+    {
+      "sku": "CTSS-098",
+      "slug": "canela-three-seater-sofa",
+      "name": "Canela Three Seater Sofa",
+      "priceCents": 259900,
+      "categoryPath": "sofas",
+      "attrs": {
+        "eco-claim": "organic-cotton"
+      }
+    },
+    {
+      "sku": "TLSS-01",
+      "slug": "traditional-l-seater-sofa",
+      "name": "Traditional L Seater Sofa",
+      "priceCents": 359900,
+      "categoryPath": "sofas",
+      "attrs": {
+        "eco-claim": "natural-latex"
+      }
+    },
+    {
+      "sku": "CTSS-0983",
+      "slug": "cotton-two-seater-sofa",
+      "name": "Cotton Two Seater Sofa",
+      "priceCents": 54900,
+      "categoryPath": "sofas",
+      "attrs": {
+        "eco-claim": "natural-latex"
+      }
+    },
+    {
+      "sku": "TTSS-01",
+      "slug": "traditional-three-seater-sofa",
+      "name": "Traditional Three Seater Sofa",
+      "priceCents": 239900,
+      "categoryPath": "sofas",
+      "attrs": {
+        "eco-claim": "natural-latex"
+      }
+    },
+    {
+      "sku": "SQB-034",
+      "slug": "ecru-double-bed",
+      "name": "Ecru Double Bed",
+      "priceCents": 89900,
+      "categoryPath": "beds",
+      "attrs": {
+        "eco-claim": "reclaimed-ash"
+      }
+    },
+    {
+      "sku": "MUTB-01",
+      "slug": "modern-upholstered-twin-bed",
+      "name": "Modern Upholstered Twin Bed",
+      "priceCents": 45000,
+      "categoryPath": "beds",
+      "attrs": {
+        "eco-claim": "low-voc-finish"
+      }
+    },
+    {
+      "sku": "OTB-07",
+      "slug": "orion-double-bed",
+      "name": "Orion Double Bed",
+      "priceCents": 159900,
+      "categoryPath": "beds",
+      "attrs": {
+        "eco-claim": "recycled-linen"
+      }
+    },
+    {
+      "sku": "CQB-09",
+      "slug": "cloud-queen-bed",
+      "name": "Cloud Queen Bed",
+      "priceCents": 45999,
+      "categoryPath": "beds",
+      "attrs": {
+        "eco-claim": "low-voc-finish"
+      }
+    },
+    {
+      "sku": "MTB-023",
+      "slug": "opal-king-bed",
+      "name": "Opal King Bed",
+      "priceCents": 129900,
+      "categoryPath": "beds",
+      "attrs": {
+        "eco-claim": "organic-cotton"
+      }
+    },
+    {
+      "sku": "IQB-09",
+      "slug": "serenity-queen-bed",
+      "name": "Serenity Queen Bed",
+      "priceCents": 99900,
+      "categoryPath": "beds",
+      "attrs": {
+        "eco-claim": "fsc-oak"
+      }
+    },
+    {
+      "sku": "RCQB-01",
+      "slug": "rustic-country-queen-bed",
+      "name": "Rustic Country Queen Bed",
+      "priceCents": 329900,
+      "categoryPath": "beds",
+      "attrs": {
+        "eco-claim": "low-voc-finish"
+      }
+    },
+    {
+      "sku": "MUQB-01",
+      "slug": "modern-upholstered-queen-bed",
+      "name": "Modern Upholstered Queen Bed",
+      "priceCents": 259900,
+      "categoryPath": "beds",
+      "attrs": {
+        "eco-claim": "organic-cotton"
+      }
+    },
+    {
+      "sku": "ADCT-01",
+      "slug": "art-deco-coffe-table",
+      "name": "Art Deco Coffee Table",
+      "priceCents": 320000,
+      "categoryPath": "living-room-tables",
+      "attrs": {
+        "eco-claim": "fsc-oak"
+      }
+    },
+    {
+      "sku": "GMCT-01",
+      "slug": "modern-gold-coffee-table",
+      "name": "Modern Gold Coffee Table",
+      "priceCents": 25999,
+      "categoryPath": "living-room-tables",
+      "attrs": {
+        "eco-claim": "recycled-steel"
+      }
+    },
+    {
+      "sku": "WCSI-09",
+      "slug": "walnut-counter-stool",
+      "name": "Walnut Counter Stool",
+      "priceCents": 8999,
+      "categoryPath": "living-room-tables",
+      "attrs": {
+        "eco-claim": "fsc-oak"
+      }
+    },
+    {
+      "sku": "MMST-01",
+      "slug": "minimalist-modern-side-table",
+      "name": "Minimalist Modern Side Table",
+      "priceCents": 12000,
+      "categoryPath": "living-room-tables",
+      "attrs": {
+        "eco-claim": "organic-cotton"
+      }
+    },
+    {
+      "sku": "CNS-0434",
+      "slug": "minimalist-cedar-nightstand",
+      "name": "Minimalist Cedar Nightstand",
+      "priceCents": 7900,
+      "categoryPath": "living-room-tables",
+      "attrs": {
+        "eco-claim": "reclaimed-ash"
+      }
+    },
+    {
+      "sku": "RCD-01",
+      "slug": "rustic-country-dresser",
+      "name": "Rustic Country Dresser",
+      "priceCents": 159900,
+      "categoryPath": "storage-and-tables",
+      "attrs": {
+        "eco-claim": "recycled-linen"
+      }
+    },
+    {
+      "sku": "MGD-01",
+      "slug": "modern-glam-dresser",
+      "name": "Modern Glam Dresser",
+      "priceCents": 179900,
+      "categoryPath": "storage-and-tables",
+      "attrs": {
+        "eco-claim": "natural-latex"
+      }
+    },
+    {
+      "sku": "EWC-07",
+      "slug": "entryway-closet",
+      "name": "Entryway Closet",
+      "priceCents": 259900,
+      "categoryPath": "storage-and-tables",
+      "attrs": {
+        "eco-claim": "recycled-wool"
+      }
+    },
+    {
+      "sku": "WCS-09",
+      "slug": "walnut-cabinet",
+      "name": "Walnut Cabinet",
+      "priceCents": 159900,
+      "categoryPath": "storage-and-tables",
+      "attrs": {
+        "eco-claim": "recycled-wool"
+      }
+    },
+    {
+      "sku": "MB-0973",
+      "slug": "modern-bookcase",
+      "name": "Modern Bookcase",
+      "priceCents": 29900,
+      "categoryPath": "storage-and-tables",
+      "attrs": {
+        "eco-claim": "recycled-wool"
+      }
+    },
+    {
+      "sku": "GC-01",
+      "slug": "green-serving-plate",
+      "name": "Green Serving Plate",
+      "priceCents": 599,
+      "categoryPath": "kitchen",
+      "attrs": {
+        "eco-claim": "fsc-oak"
+      }
+    },
+    {
+      "sku": "CCM-089",
+      "slug": "comfort-coffee-mug",
+      "name": "Comfort Coffee Mug",
+      "priceCents": 149,
+      "categoryPath": "kitchen",
+      "attrs": {
+        "eco-claim": "organic-cotton"
+      }
+    },
+    {
+      "sku": "LCO-034",
+      "slug": "leather-coaster",
+      "name": "Leather Coaster",
+      "priceCents": 2499,
+      "categoryPath": "kitchen",
+      "attrs": {
+        "eco-claim": "low-voc-finish"
+      }
+    },
+    {
+      "sku": "BAMB-084",
+      "slug": "square-bamboo-coaster",
+      "name": "Square Bamboo Coaster",
+      "priceCents": 1099,
+      "categoryPath": "kitchen",
+      "attrs": {
+        "eco-claim": "recycled-linen"
+      }
+    },
+    {
+      "sku": "SGB-01",
+      "slug": "sunnai-glass-bowl",
+      "name": "Sunnai Glass Bowl",
+      "priceCents": 799,
+      "categoryPath": "kitchen",
+      "attrs": {
+        "eco-claim": "fsc-oak"
+      }
+    },
+    {
+      "sku": "WTP-09",
+      "slug": "willow-teapot",
+      "name": "Willow Teapot",
+      "priceCents": 899,
+      "categoryPath": "kitchen",
+      "attrs": {
+        "eco-claim": "recycled-linen"
+      }
+    },
+    {
+      "sku": "BCOAS-08",
+      "slug": "modern-black-coaster",
+      "name": "Modern Black Coaster",
+      "priceCents": 1999,
+      "categoryPath": "kitchen",
+      "attrs": {
+        "eco-claim": "recycled-linen"
+      }
+    },
+    {
+      "sku": "CWG-01",
+      "slug": "chianti-wine-glass",
+      "name": "Chianti Wine Glass",
+      "priceCents": 2599,
+      "categoryPath": "kitchen",
+      "attrs": {
+        "eco-claim": "organic-cotton"
+      }
+    },
+    {
+      "sku": "MPC-02",
+      "slug": "maya-pillow-cover",
+      "name": "Maya Pillow Cover",
+      "priceCents": 899,
+      "categoryPath": "home-decor",
+      "attrs": {
+        "eco-claim": "recycled-linen"
+      }
+    },
+    {
+      "sku": "PAP-01",
+      "slug": "pink-abstract-painting",
+      "name": "Pink Abstract Painting",
+      "priceCents": 5999,
+      "categoryPath": "home-decor",
+      "attrs": {
+        "eco-claim": "recycled-steel"
+      }
+    },
+    {
+      "sku": "JAR-08",
+      "slug": "jute-rug",
+      "name": "Jute Rug",
+      "priceCents": 39900,
+      "categoryPath": "home-decor",
+      "attrs": {
+        "eco-claim": "natural-latex"
+      }
+    },
+    {
+      "sku": "LPC-09",
+      "slug": "lana-pillow-cover",
+      "name": "Lana Pillow Cover",
+      "priceCents": 1099,
+      "categoryPath": "home-decor",
+      "attrs": {
+        "eco-claim": "recycled-steel"
+      }
+    },
+    {
+      "sku": "ARG-56",
+      "slug": "ashen-rug",
+      "name": "Ashen Rug",
+      "priceCents": 25000,
+      "categoryPath": "home-decor",
+      "attrs": {
+        "eco-claim": "natural-latex"
+      }
+    },
+    {
+      "sku": "AMR-09",
+      "slug": "amalia-rug",
+      "name": "Amalia Rug",
+      "priceCents": 13999,
+      "categoryPath": "home-decor",
+      "attrs": {
+        "eco-claim": "natural-latex"
+      }
+    },
+    {
+      "sku": "ADPC-09",
+      "slug": "patterned-pillow-cover",
+      "name": "Patterned Pillow Cover",
+      "priceCents": 1499,
+      "categoryPath": "home-decor",
+      "attrs": {
+        "eco-claim": "low-voc-finish"
+      }
+    }
+  ],
+  "stores": [
+    {
+      "key": "store-austin-domain",
+      "name": "The Good Store \u2014 Austin Domain",
+      "city": "Austin",
+      "state": "TX",
+      "weight": 3,
+      "fulfillments": [
+        "pickup",
+        "curbside",
+        "reserve"
+      ]
+    },
+    {
+      "key": "store-chicago-mag-mile",
+      "name": "The Good Store \u2014 Chicago Mag Mile",
+      "city": "Chicago",
+      "state": "IL",
+      "weight": 6,
+      "fulfillments": [
+        "pickup",
+        "curbside",
+        "reserve"
+      ]
+    },
+    {
+      "key": "store-la-downtown",
+      "name": "The Good Store \u2014 Downtown LA",
+      "city": "Los Angeles",
+      "state": "CA",
+      "weight": 7,
+      "fulfillments": [
+        "pickup",
+        "curbside",
+        "ship_from_store",
+        "reserve"
+      ]
+    },
+    {
+      "key": "store-nyc-soho",
+      "name": "The Good Store \u2014 NYC SoHo",
+      "city": "New York",
+      "state": "NY",
+      "weight": 9,
+      "fulfillments": [
+        "pickup",
+        "ship_from_store",
+        "reserve"
+      ]
+    },
+    {
+      "key": "store-seattle-downtown",
+      "name": "The Good Store \u2014 Seattle Downtown",
+      "city": "Seattle",
+      "state": "WA",
+      "weight": 4,
+      "fulfillments": [
+        "pickup",
+        "curbside",
+        "ship_from_store",
+        "reserve"
+      ]
+    },
+    {
+      "key": "store-sf-union-square",
+      "name": "The Good Store \u2014 SF Union Square",
+      "city": "San Francisco",
+      "state": "CA",
+      "weight": 5,
+      "fulfillments": [
+        "pickup",
+        "curbside",
+        "ship_from_store",
+        "reserve"
+      ]
+    }
+  ],
+  "storeFulfillmentRate": 0.38
+}
