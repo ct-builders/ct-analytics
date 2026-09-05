@@ -312,22 +312,28 @@ async function perform(page, base, profile, step, session, lastClick = {}) {
 
     case 'login': {
       if (!step.customer) return 'no customer on this shopper';
-      await go(page, base + pathFor(profile, 'login'));
-      const loginEmail = page.locator(sel.loginEmail).first();
-      const filled = await fillField(page, loginEmail, step.customer.email);
-      await fillField(page, page.locator(sel.loginPassword).first(), step.customer.password || '123');
-      if (!filled) return 'the email field would not hold a value';
-      await submitForm(page, loginEmail, sel.loginSubmit);
-
-      // The sign-in posts and then redirects on the client, which against a
-      // cold serverless storefront takes seconds. One load state and a dwell
-      // decide before the answer arrives, and the visit is then logged as a
-      // rejected sign-in for a customer who signed in perfectly well — which
-      // reads as a broken storefront rather than as a driver in a hurry.
       const loginPath = pathFor(profile, 'login');
-      await page
-        .waitForURL((url) => !url.pathname.includes(loginPath), { timeout: 20_000 })
-        .catch(() => {});
+      await go(page, base + loginPath);
+
+      // Same treatment as the gate, for the same reason: a form submitted
+      // before its framework is live posts nothing at all, and the visit is
+      // then logged as a rejected sign-in for a customer who signs in
+      // perfectly well. Confirm, and try again if it did not take.
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const loginEmail = page.locator(sel.loginEmail).first();
+        const filled = await fillField(page, loginEmail, step.customer.email);
+        await fillField(page, page.locator(sel.loginPassword).first(), step.customer.password || '123');
+        if (!filled) return 'the email field would not hold a value';
+        await submitForm(page, loginEmail, sel.loginSubmit);
+
+        // The sign-in posts and then redirects on the client, which against a
+        // cold serverless storefront takes seconds.
+        await page
+          .waitForURL((url) => !url.pathname.includes(loginPath), { timeout: 20_000 })
+          .catch(() => {});
+        if (!page.url().includes(loginPath)) break;
+        await go(page, base + loginPath);
+      }
 
       // Signed in is a claim about the page, not about the URL: a gated site
       // bounces an unauthenticated visitor somewhere that is also "not the
@@ -477,6 +483,11 @@ async function perform(page, base, profile, step, session, lastClick = {}) {
       const sku = /\/p\/([^/?#]+)/.exec(page.url())?.[1];
       if (sku) step.product = { ...step.product, sku: decodeURIComponent(sku) };
 
+      // One click adds one unit, whatever the script asked for. Holding the
+      // tracking to a quantity the driver never entered reports a field error
+      // for an add-to-cart that was recorded exactly right.
+      step.quantity = 1;
+
       // Sticky headers and cart drawers overlap controls on a narrow
       // viewport; the intent is the click, not the hit-test.
       await button.click({ force: true });
@@ -497,10 +508,22 @@ async function perform(page, base, profile, step, session, lastClick = {}) {
       return true;
     }
 
-    case 'checkout':
-      await go(page, base + pathFor(profile, 'checkout'));
+    case 'checkout': {
+      const checkoutPath = pathFor(profile, 'checkout');
+      await go(page, base + checkoutPath);
+      // A checkout index typically reports the start of checkout once the
+      // cart has loaded, and only then redirects to its first step. Leaving
+      // during that wait records a checkout the storefront never got to
+      // report, and the check calls it a missing event.
+      await page
+        .waitForURL((url) => url.pathname !== checkoutPath, { timeout: 15_000 })
+        .catch(() => {});
+      // Only the first step is reached: going further needs an address and a
+      // payment method this driver does not have.
+      step.checkoutSteps = 1;
       await dwell('default');
       return true;
+    }
 
     case 'placeOrder':
       // Completing a real checkout needs an address and a payment method this
