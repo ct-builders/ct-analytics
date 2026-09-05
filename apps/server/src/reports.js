@@ -19,7 +19,12 @@
 
 import { rows, one } from './db.js';
 import { buildWhere } from './filters.js';
-import { FUNNEL_STEPS, EVENT_LABELS } from '../../../packages/shared/events.js';
+import {
+  FUNNEL_STEPS,
+  EVENT_LABELS,
+  FULFILLMENT_LABELS,
+  STORE_FULFILLMENTS
+} from '../../../packages/shared/events.js';
 
 /**
  * The common prefix: every event in the segment, with its session's
@@ -550,6 +555,150 @@ const products = {
   }
 };
 
+/* -------------------------------------------------------- omnichannel */
+
+
+const fulfillmentMix = {
+  key: 'fulfillment',
+  title: 'Fulfilment mix',
+  blurb: 'How shoppers chose to receive their orders, and what each choice is worth.',
+  group: 'Omnichannel',
+  columns: [
+    { key: 'label', label: 'Fulfilment', type: T.text },
+    { key: 'carts', label: 'Chosen at cart', type: T.number },
+    { key: 'checkouts', label: 'Reached checkout', type: T.number },
+    { key: 'orders', label: 'Orders', type: T.number },
+    { key: 'units', label: 'Units', type: T.number },
+    { key: 'revenue', label: 'Revenue', type: T.money },
+    { key: 'share_of_revenue', label: 'Share of revenue', type: T.percent },
+    { key: 'cart_to_order', label: 'Cart to order', type: T.percent }
+  ],
+  async run(f) {
+    const s = scoped(f);
+    const r = await rows(
+      `WITH ${s.cte},
+       chosen AS (
+         SELECT fulfillment,
+                COUNT(*) FILTER (WHERE type = 'add_to_cart')     AS carts,
+                COUNT(*) FILTER (WHERE type = 'checkout_start')  AS checkouts,
+                COUNT(*) FILTER (WHERE type = 'order_submit')    AS orders
+           FROM scoped
+          WHERE fulfillment IS NOT NULL
+          GROUP BY fulfillment
+       ),
+       -- Revenue comes from the order LINES, not the order total: a mixed
+       -- basket can ship one line and hold another for collection, and
+       -- crediting the whole order to one method would overstate whichever
+       -- the shopper happened to pick last.
+       sold AS (
+         SELECT COALESCE(oi.fulfillment, 'delivery') AS fulfillment,
+                SUM(oi.quantity)                              AS units,
+                SUM(oi.quantity * COALESCE(oi.unit_amount, 0)) AS revenue,
+                MODE() WITHIN GROUP (ORDER BY oi.currency)     AS currency
+           FROM order_items oi
+           JOIN scoped oe ON oe.id = oi.event_id
+          GROUP BY 1
+       )
+       SELECT COALESCE(c.fulfillment, s2.fulfillment)  AS fulfillment,
+              COALESCE(c.carts, 0)                     AS carts,
+              COALESCE(c.checkouts, 0)                 AS checkouts,
+              COALESCE(c.orders, 0)                    AS orders,
+              COALESCE(s2.units, 0)                    AS units,
+              COALESCE(s2.revenue, 0)                  AS revenue,
+              s2.currency,
+              CASE WHEN COALESCE(c.carts, 0) > 0
+                   THEN (COALESCE(c.orders, 0)::numeric / c.carts) * 100
+                   ELSE NULL END                       AS cart_to_order
+         FROM chosen c
+         FULL OUTER JOIN sold s2 ON s2.fulfillment = c.fulfillment
+        ORDER BY revenue DESC NULLS LAST`,
+      s.params
+    );
+
+    const totalRevenue = r.reduce((n, row) => n + Number(row.revenue || 0), 0);
+    const storeRevenue = r
+      .filter((row) => STORE_FULFILLMENTS.includes(row.fulfillment))
+      .reduce((n, row) => n + Number(row.revenue || 0), 0);
+
+    return {
+      rows: r.map((row) => ({
+        ...row,
+        label: FULFILLMENT_LABELS[row.fulfillment] ?? row.fulfillment,
+        share_of_revenue: totalRevenue ? (Number(row.revenue || 0) / totalRevenue) * 100 : null
+      })),
+      currency: r.find((x) => x.currency)?.currency ?? null,
+      note:
+        totalRevenue > 0
+          ? `The store network carried ${((storeRevenue / totalRevenue) * 100).toFixed(1)}% of revenue ` +
+            'in this segment — pick-up, curbside, reserve and ship-from-store combined.'
+          : 'No revenue in this segment yet.'
+    };
+  }
+};
+
+const storePerformance = {
+  key: 'stores',
+  title: 'Store performance',
+  blurb: 'Every location the online channel sent business to, and how much.',
+  group: 'Omnichannel',
+  columns: [
+    { key: 'location', label: 'Store', type: T.text },
+    { key: 'location_key', label: 'Key', type: T.code },
+    { key: 'carts', label: 'Chosen at cart', type: T.number },
+    { key: 'orders', label: 'Orders', type: T.number },
+    { key: 'units', label: 'Units', type: T.number },
+    { key: 'revenue', label: 'Revenue', type: T.money },
+    { key: 'methods', label: 'Methods used', type: T.text },
+    { key: 'shoppers', label: 'Shoppers', type: T.number },
+    { key: 'last_order', label: 'Last order', type: T.date }
+  ],
+  async run(f) {
+    const s = scoped(f);
+    const r = await rows(
+      `WITH ${s.cte},
+       touched AS (
+         SELECT location_key,
+                MAX(COALESCE(location_name, location_key))       AS location,
+                COUNT(*) FILTER (WHERE type = 'add_to_cart')     AS carts,
+                COUNT(*) FILTER (WHERE type = 'order_submit')    AS orders,
+                COUNT(DISTINCT shopper_id)                       AS shoppers,
+                string_agg(DISTINCT fulfillment, ', ')            AS methods,
+                MAX(ts) FILTER (WHERE type = 'order_submit')      AS last_order
+           FROM scoped
+          WHERE location_key IS NOT NULL
+          GROUP BY location_key
+       ),
+       sold AS (
+         SELECT oi.location_key,
+                SUM(oi.quantity)                               AS units,
+                SUM(oi.quantity * COALESCE(oi.unit_amount, 0))  AS revenue,
+                MODE() WITHIN GROUP (ORDER BY oi.currency)      AS currency
+           FROM order_items oi
+           JOIN scoped oe ON oe.id = oi.event_id
+          WHERE oi.location_key IS NOT NULL
+          GROUP BY oi.location_key
+       )
+       SELECT t.location_key, t.location, t.carts, t.orders, t.shoppers,
+              t.methods, t.last_order,
+              COALESCE(s2.units, 0)   AS units,
+              COALESCE(s2.revenue, 0) AS revenue,
+              s2.currency
+         FROM touched t
+         LEFT JOIN sold s2 ON s2.location_key = t.location_key
+        ORDER BY revenue DESC, t.carts DESC
+        LIMIT $${s.next}`,
+      [...s.params, f.limit]
+    );
+    return {
+      rows: r,
+      currency: r.find((x) => x.currency)?.currency ?? null,
+      note:
+        'Aggregate across all locations is the Fulfilment mix report; this is the same ' +
+        'business split by where it landed.'
+    };
+  }
+};
+
 /* -------------------------------------------------------------------- orders */
 
 const orders = {
@@ -859,6 +1008,8 @@ export const REPORTS = [
   facets,
   categories,
   products,
+  fulfillmentMix,
+  storePerformance,
   orders,
   pages,
   logins,

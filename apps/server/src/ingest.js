@@ -13,9 +13,13 @@
  */
 
 import { validatePayload, str, int, num, isObject } from '../../../packages/shared/wire.js';
+import { FULFILLMENTS } from '../../../packages/shared/events.js';
 import { transaction, query } from './db.js';
 import { config } from './config.js';
 import { HttpError } from './http.js';
+
+/** The closed fulfilment set, for rejecting anything outside it. */
+const FULFILLMENT_SET = new Set(FULFILLMENTS);
 
 /**
  * Device class from the user agent.
@@ -34,6 +38,21 @@ export function deviceFrom(userAgent) {
   if (/mobi|iphone|ipod|windows phone/.test(ua)) return 'mobile';
   if (/android/.test(ua)) return 'tablet';
   return 'desktop';
+}
+
+/**
+ * The fulfilment on an event, if it is one of the closed set.
+ *
+ * An unrecognised value is dropped rather than stored: the whole point of
+ * closing the set is that the fulfilment-mix report has a fixed number of
+ * rows, and one site sending `Pickup` alongside another sending `pickup`
+ * would split the most-read number in the report in two.
+ */
+function fulfillmentOf(event) {
+  const value = str(event.fulfillment);
+  if (!value) return null;
+  const normalised = value.toLowerCase().replace(/[\s-]+/g, '_');
+  return FULFILLMENT_SET.has(normalised) ? normalised : null;
 }
 
 /** Money helper: minor units and currency, or nulls. */
@@ -81,7 +100,9 @@ const COLUMNS = [
   'step', 'order_id', 'order_number', 'order_amount',
   'customer_id', 'customer_ref', 'login_method',
   'discovery_id', 'discovery_type', 'source_query', 'source_category_path',
-  'source_position', 'source_facets', 'props'
+  'source_position', 'source_facets',
+  'fulfillment', 'location_key', 'location_name',
+  'props'
 ];
 
 /**
@@ -145,6 +166,12 @@ export function toRow(event, ctx) {
     customer_id: str(event.customerId) ?? str(c.customerId) ?? null,
     customer_ref: str(event.customerRef) ?? str(c.customerRef) ?? null,
     login_method: str(event.method) ?? null,
+
+    // Omnichannel. `location_*` is the physical place, deliberately separate
+    // from the session's `store`, which is the sales channel.
+    fulfillment: fulfillmentOf(event),
+    location_key: isObject(event.location) ? str(event.location.key) ?? null : null,
+    location_name: isObject(event.location) ? str(event.location.name) ?? null : null,
 
     discovery_id: str(a.discoveryId) ?? null,
     discovery_type: str(a.discoveryType) ?? null,
@@ -294,11 +321,18 @@ async function insertOrderItems(client, insertedRows, events, siteId, sessionId)
       if (!p.product_id && !p.product_key && !p.sku) continue;
       const unit = money(item.product && item.product.price);
       const base = params.length;
-      tuples.push(`($${base + 1},$${base + 2},$${base + 3},$${base + 4},$${base + 5},$${base + 6},$${base + 7},$${base + 8},$${base + 9},$${base + 10})`);
+      tuples.push(
+        `(${Array.from({ length: 12 }, (_, n) => `$${base + n + 1}`).join(',')})`
+      );
+      // A mixed basket can ship one line and hold another for collection, so
+      // a line's own fulfilment wins; otherwise it inherits the order's.
       params.push(
         eventId, siteId, sessionId,
         p.product_id, p.product_key, p.sku, p.product_name,
-        int(item.quantity) ?? 1, unit.amount, unit.currency
+        int(item.quantity) ?? 1, unit.amount, unit.currency,
+        fulfillmentOf(item) ?? fulfillmentOf(event),
+        (isObject(item.location) ? str(item.location.key) : null) ??
+          (isObject(event.location) ? str(event.location.key) : null) ?? null
       );
     }
   });
@@ -307,7 +341,8 @@ async function insertOrderItems(client, insertedRows, events, siteId, sessionId)
   await client.query(
     `INSERT INTO order_items
        (event_id, site_id, session_id, product_id, product_key, sku,
-        product_name, quantity, unit_amount, currency)
+        product_name, quantity, unit_amount, currency,
+        fulfillment, location_key)
      VALUES ${tuples.join(',')}`,
     params
   );

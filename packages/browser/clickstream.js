@@ -751,12 +751,20 @@
 
     productView: function (product) { track({ type: 'product_view', product: product }); },
 
-    addToCart: function (product, quantity, cartTotal) {
-      track({ type: 'add_to_cart', product: product, quantity: intOr(quantity, 1), cartTotal: cartTotal });
+    addToCart: function (product, quantity, cartTotal, extra) {
+      var e = { type: 'add_to_cart', product: product, quantity: intOr(quantity, 1), cartTotal: cartTotal };
+      // `extra` is where omnichannel lives: { fulfillment, location }. A
+      // shopper choosing collection at add-to-cart is the earliest signal the
+      // store network is involved, and waiting for the order to find out
+      // loses every abandoned basket that wanted a store.
+      if (extra) for (var k in extra) if (has(extra, k)) e[k] = extra[k];
+      track(e);
     },
 
-    removeFromCart: function (product, quantity, cartTotal) {
-      track({ type: 'remove_from_cart', product: product, quantity: intOr(quantity, 1), cartTotal: cartTotal });
+    removeFromCart: function (product, quantity, cartTotal, extra) {
+      var e = { type: 'remove_from_cart', product: product, quantity: intOr(quantity, 1), cartTotal: cartTotal };
+      if (extra) for (var k2 in extra) if (has(extra, k2)) e[k2] = extra[k2];
+      track(e);
     },
 
     cartView: function (extra) {
@@ -1008,6 +1016,22 @@
    *   <button data-clickstream="facet_apply" data-facet-name="color"
    *           data-facet-value="blue">Blue</button>
    */
+  /**
+   * Omnichannel dimensions from a data attribute set.
+   *
+   * `data-fulfillment="pickup" data-location-key="bk-01"` on the same button
+   * that carries the add-to-cart is all a site needs; the collector rejects a
+   * fulfilment outside the closed set rather than storing a variant spelling.
+   */
+  function omniFrom(d) {
+    var out = {};
+    var f = str(d.fulfillment);
+    if (f) out.fulfillment = f;
+    var key = str(d.locationKey);
+    if (key) out.location = { key: key, name: str(d.locationName) };
+    return out;
+  }
+
   function productFrom(d) {
     var p = {};
     if (d.productId) p.productId = d.productId;
@@ -1047,10 +1071,10 @@
         api.productView(productFrom(d));
         break;
       case 'add_to_cart':
-        api.addToCart(productFrom(d), intOr(d.quantity, 1), money(d.cartTotal, d.currency));
+        api.addToCart(productFrom(d), intOr(d.quantity, 1), money(d.cartTotal, d.currency), omniFrom(d));
         break;
       case 'remove_from_cart':
-        api.removeFromCart(productFrom(d), intOr(d.quantity, 1), money(d.cartTotal, d.currency));
+        api.removeFromCart(productFrom(d), intOr(d.quantity, 1), money(d.cartTotal, d.currency), omniFrom(d));
         break;
       case 'facet_apply':
         api.facetApply({ name: str(d.facetName), value: str(d.facetValue) || '' }, facetsFrom(d), intOrUndef(d.resultCount));
@@ -1067,9 +1091,13 @@
       case 'category_view':
         api.categoryView(d.categoryPath, { categoryId: d.categoryId, categoryName: d.categoryName });
         break;
-      case 'checkout_start':
-        api.checkoutStart({ cartTotal: money(d.cartTotal, d.currency), itemCount: intOrUndef(d.itemCount) });
+      case 'checkout_start': {
+        var co = { cartTotal: money(d.cartTotal, d.currency), itemCount: intOrUndef(d.itemCount) };
+        var omni = omniFrom(d);
+        for (var ck in omni) if (has(omni, ck)) co[ck] = omni[ck];
+        api.checkoutStart(co);
         break;
+      }
       case 'logout':
         api.logout();
         break;

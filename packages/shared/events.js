@@ -17,6 +17,31 @@
  * every event carries. Anything a report slices by earns a real field instead.
  */
 
+/**
+ * How an order reaches the shopper.
+ *
+ * An omnichannel storefront's most valuable analytics question is not "how
+ * many orders" but "how much of the business is the store network carrying" —
+ * and a delivery-only funnel cannot answer it. A closed set, because these
+ * five are choices a shopper makes at checkout and a free-form string would
+ * fragment the one report that compares them.
+ *
+ * @typedef {'delivery'|'pickup'|'curbside'|'reserve'|'ship_from_store'} Fulfillment
+ */
+
+/**
+ * A physical location, when fulfilment involves one.
+ *
+ * `key` is what reports group by, so it must be stable; `name` is denormalised
+ * for display so a report needs no store lookup.
+ *
+ * Deliberately not the same field as `context.store`, which is the sales
+ * channel or market a session belongs to. A shopper on the US channel
+ * collecting in Brooklyn has both, and collapsing them makes each unusable.
+ *
+ * @typedef {{ key: string, name?: string }} StoreLocation
+ */
+
 /** @typedef {'home'|'search'|'category'|'product'|'cart'|'checkout'|'order_confirmation'|'account'|'login'|'other'} PageType */
 
 /**
@@ -120,3 +145,33 @@ export const EVENT_LABELS = {
 
 /** Event types that carry a product, and so participate in attribution. */
 export const PRODUCT_EVENTS = ['result_click', 'product_view', 'add_to_cart', 'remove_from_cart'];
+
+/** The closed set of fulfilment methods, in rough order of store involvement. */
+export const FULFILLMENTS = ['delivery', 'pickup', 'curbside', 'reserve', 'ship_from_store'];
+
+/** Human labels, used in the admin. */
+export const FULFILLMENT_LABELS = {
+  delivery: 'Ship to me',
+  pickup: 'Pick up in store',
+  curbside: 'Curbside',
+  reserve: 'Reserve in store',
+  ship_from_store: 'Shipped from store'
+};
+
+/**
+ * Fulfilment methods the store network carries.
+ *
+ * Reports use this to separate "revenue a store touched" from plain delivery,
+ * which is the number an omnichannel programme is judged on.
+ */
+export const STORE_FULFILLMENTS = ['pickup', 'curbside', 'reserve', 'ship_from_store'];
+
+/** Event types that may carry a fulfilment choice and a location. */
+export const FULFILLMENT_EVENTS = [
+  'add_to_cart',
+  'remove_from_cart',
+  'cart_view',
+  'checkout_start',
+  'checkout_step',
+  'order_submit'
+];
