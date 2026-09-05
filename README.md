@@ -19,11 +19,20 @@ One script tag on any site that can host one — a Next.js storefront, a
 hand-written HTML page, a template you only reach through a CMS field.
 
 ```html
-<script src="https://your-collector.example/c.js?site=acme" defer></script>
+<script>window.CLICKSTREAM_CONFIG = { site: 'acme', endpoint: '/api/clickstream' };</script>
+<script src="https://your-collector.example/c.js" defer></script>
 ```
 
 That alone reports page views, classifies every page from its URL, follows
 single-page navigations, and picks the search term out of the query string.
+
+`endpoint` is a path on **your own** origin, which your server proxies to the
+collector. Ingest requires a bearer token and the collector refuses to start
+without one, so the token lives on your server and is attached there — a
+secret shipped to a browser is not a secret. The proxy is about twenty lines;
+there is a working one in `examples/storefront/server.js`, and
+[docs/security.md](docs/security.md) covers the alternative for sites with no
+backend of their own.
 
 Two further levels are available, and a site can mix all three freely.
 
@@ -137,6 +146,16 @@ Site-specific dimensions go in `props`, which every event accepts.
 
 See [docs/events.md](docs/events.md), or the live reference at
 `/events` in the admin.
+
+## Security
+
+Ingest is authenticated with a bearer token, and the collector refuses to start
+without a credential — an open write endpoint fails invisibly, because the
+reports fill up and look completely normal. The admin sits behind a shared
+password or a token, and refuses every request when neither is configured.
+
+Full account, including what browser-direct ingest is and is not worth:
+[docs/security.md](docs/security.md).
 
 ## What it stores about people
 

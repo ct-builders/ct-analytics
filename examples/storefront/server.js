@@ -27,6 +27,15 @@ const PORT = Number(process.env.PORT || 3000);
 const COLLECTOR = process.env.CLICKSTREAM_COLLECTOR || 'http://localhost:8080';
 const SITE = process.env.CLICKSTREAM_SITE || 'example';
 
+/**
+ * The ingest token.
+ *
+ * It lives HERE, on the server, and is attached below on the way out. It is
+ * never sent to the browser, which is the whole point of the proxy: a token in
+ * a page is readable by anyone who views source, so a browser cannot hold one.
+ */
+const INGEST_KEY = process.env.CLICKSTREAM_INGEST_KEY || '';
+
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'application/javascript; charset=utf-8',
@@ -51,6 +60,8 @@ const server = createServer(async (req, res) => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          // The credential the browser does not have.
+          ...(INGEST_KEY ? { Authorization: `Bearer ${INGEST_KEY}` } : {}),
           // Passed through so the collector can classify the device.
           'User-Agent': req.headers['user-agent'] || 'unknown'
         },
@@ -109,4 +120,10 @@ const server = createServer(async (req, res) => {
 server.listen(PORT, () => {
   console.log(`[storefront] http://localhost:${PORT}`);
   console.log(`[storefront] posting events to ${COLLECTOR}/collect as site "${SITE}"`);
+  if (!INGEST_KEY) {
+    console.warn(
+      '[storefront] CLICKSTREAM_INGEST_KEY is not set — the collector will refuse every event ' +
+        'with 401. Set it to the same value the collector runs with.'
+    );
+  }
 });

@@ -19,7 +19,7 @@ import { createServer } from 'node:http';
 // Set before the first import that reaches config.js.
 process.env.CLICKSTREAM_ADMIN_TOKEN = 'unused-token';
 
-import { scratchDatabase, startServer } from './helpers.mjs';
+import { scratchDatabase, startServer, INGEST_KEY } from './helpers.mjs';
 
 const PASSWORD = 'lights';
 let db;
@@ -211,7 +211,7 @@ test('the collector stays ungated — a shopper has no gate cookie', async () =>
   // Gating ingest would silently stop every event on every instrumented site.
   const res = await fetch(`${server.base}/collect`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${INGEST_KEY}` },
     body: JSON.stringify({
       site: 'shop',
       anonymousId: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',

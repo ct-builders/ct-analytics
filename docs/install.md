@@ -3,10 +3,30 @@
 Three levels of integration. A site can use any mix of them, and they compose
 without double-counting.
 
+## Before anything: where events are posted
+
+Ingest requires a bearer token, and the collector refuses to start without a
+credential. A browser cannot hold one, so the browser posts to a path on your
+own origin and your server attaches the token:
+
+```
+browser ──POST /api/clickstream──► your server ──POST /collect──► collector
+   (no secret)    (same origin)     (holds token)   (Bearer token)
+```
+
+Set `endpoint` to that path. It is also the arrangement you want anyway: the
+request is same-origin, so tracker-blocking extensions leave it alone and there
+is no CORS configuration to get wrong.
+
+A site with no backend of its own can opt into browser-direct posting, which is
+authenticated by the `Origin` header alone. That is meaningfully weaker and
+[docs/security.md](security.md) says exactly how.
+
 ## Level 1 — the script tag
 
 ```html
-<script src="https://your-collector.example/c.js?site=acme" defer></script>
+<script>window.CLICKSTREAM_CONFIG = { site: 'acme', endpoint: '/api/clickstream' };</script>
+<script src="https://your-collector.example/c.js" defer></script>
 ```
 
 This alone gives you:
@@ -35,7 +55,7 @@ when the tag is pasted into a CMS field that strips unknown attributes.
 | Option | Default | What it does |
 |---|---|---|
 | `site` | — | Site slug. Required; nothing is sent without it |
-| `endpoint` | `<script origin>/collect` | Where to POST |
+| `endpoint` | `<script origin>/collect` | Where to POST. Set this to a path on your own origin |
 | `auto` | `true` | Report page views automatically |
 | `autoSearch` | `true` | Watch the query string for a search term |
 | `autoClicks` | `true` | Bind the `data-clickstream` click listener |

@@ -22,6 +22,16 @@ import { promisify } from 'node:util';
 
 const exec = promisify(execFile);
 const here = dirname(fileURLToPath(import.meta.url));
+
+/**
+ * The ingest token every test writes with.
+ *
+ * Set at module scope because `config.js` reads the environment once at import
+ * and is pulled in lazily by the helpers below — so this has to land before
+ * the first of them runs.
+ */
+export const INGEST_KEY = 'test-ingest-key-0123456789abcdef';
+process.env.CLICKSTREAM_INGEST_KEY = INGEST_KEY;
 export const REPO_ROOT = join(here, '..', '..', '..');
 const BROWSER_FILE = join(REPO_ROOT, 'packages', 'browser', 'clickstream.js');
 
@@ -148,7 +158,15 @@ export async function loadClient(opts) {
 }
 
 /**
- * Boot the collector and admin on an ephemeral port.
+ * Boot the collector and admin on an ephemeral port, with a first-party ingest
+ * proxy in front.
+ *
+ * The proxy is not test scaffolding — it is the architecture the docs
+ * recommend and the only one in which ingest is genuinely authenticated. A
+ * shopper's browser cannot hold a secret, so it posts same-origin to the
+ * site's own path and the site's server attaches the token. Driving the real
+ * browser client through it means the end-to-end test exercises the shape a
+ * production deployment actually has.
  *
  * Note what is NOT here: setting CLICKSTREAM_ADMIN_TOKEN. `config.js` reads the
  * environment once at module load, and by the time this runs it has already
@@ -164,6 +182,24 @@ export async function startServer() {
 
   const server = createServer(async (req, res) => {
     try {
+      // Stand in for the site's own backend: same-origin in, token added on
+      // the way out, so the browser never sees the credential.
+      if (req.url === '/api/clickstream' && req.method === 'POST') {
+        const chunks = [];
+        for await (const chunk of req) chunks.push(chunk);
+        const upstream = await fetch(`http://127.0.0.1:${server.address().port}/collect`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${INGEST_KEY}`,
+            'User-Agent': req.headers['user-agent'] || 'test'
+          },
+          body: Buffer.concat(chunks)
+        });
+        res.writeHead(upstream.status, { 'Content-Type': 'application/json' });
+        res.end(await upstream.text());
+        return;
+      }
       await handleRequest(req, res);
     } catch (err) {
       res.writeHead(500).end(err.message);

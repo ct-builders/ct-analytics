@@ -120,6 +120,14 @@ as **two services from one image**, because their exposure is opposite: the
 collector must be reachable by every shopper's browser, and the admin must not
 be.
 
+Ingest is authenticated, so mint the token first. The collector refuses to
+start without a credential.
+
+```bash
+INGEST_KEY="$(openssl rand -hex 32)"
+printf '%s' "$INGEST_KEY" | gcloud secrets create clickstream-ingest-key --data-file=-
+```
+
 ```bash
 gcloud run deploy clickstream-collector \
   --source . \
@@ -127,9 +135,14 @@ gcloud run deploy clickstream-collector \
   --allow-unauthenticated \
   --add-cloudsql-instances="YOUR_PROJECT_ID:$REGION:$INSTANCE" \
   --set-env-vars="MODE=collect,PGHOST=/cloudsql/YOUR_PROJECT_ID:$REGION:$INSTANCE,PGDATABASE=$DB,PGUSER=clickstream_app" \
-  --set-secrets="PGPASSWORD=clickstream-db-password:latest" \
+  --set-secrets="PGPASSWORD=clickstream-db-password:latest,CLICKSTREAM_INGEST_KEY=clickstream-ingest-key:latest" \
   --min-instances=1
 ```
+
+`--allow-unauthenticated` here means "no Google IAM in front"; the endpoint is
+still closed, by the bearer token. Your site's proxy needs the same secret —
+give its service account `roles/secretmanager.secretAccessor` on
+`clickstream-ingest-key` rather than copying the value around.
 
 Two flags are worth understanding rather than copying.
 
@@ -188,10 +201,9 @@ Then the script tag:
 
 Four settings, and the first two are the ones that matter.
 
-**Set per-site origins.** Until a site lists them, the collector accepts events
-for it from any origin — convenient while you are wiring things up, and an open
-door to anyone who wants to write junk into your reports. The `--origins` flag
-above is how you close it.
+**Keep ingest on the token, not on origins.** The token is the real control;
+per-site origins only matter if you opt into browser-direct posting, where they
+are required and enforced. See [security.md](security.md).
 
 **Turn on retention.** `CLICKSTREAM_RETENTION_DAYS=180` on a scheduled job, with
 `npm run retention`. A system that records shopper behaviour and never forgets

@@ -20,7 +20,7 @@ import { dirname, join } from 'node:path';
 import { config } from './config.js';
 import { ingest } from './ingest.js';
 import { rows } from './db.js';
-import { corsHeaders, json, parseUrl, readJson, send } from './http.js';
+import { corsHeaders, json, parseUrl, readJson, safeEqual, send } from './http.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const BROWSER_DIR = join(here, '..', '..', '..', 'packages', 'browser');
@@ -50,6 +50,60 @@ async function allowedOrigins(slug) {
   }
   originCache.set(slug, { origins, expires: Date.now() + ORIGIN_TTL_MS });
   return origins;
+}
+
+/**
+ * Is this event POST allowed to write?
+ *
+ * Two acceptable answers, and no third.
+ *
+ * 1. It carries the ingest token. This is real authentication, and it implies
+ *    the caller is a server — a site's own backend proxying its shoppers'
+ *    events. A token in a browser is readable by anyone who views source, so
+ *    the browser is never given one.
+ *
+ * 2. Browser-direct posts are explicitly enabled AND the request's `Origin` is
+ *    on that site's allowlist. This is weaker and worth naming honestly:
+ *    `Origin` is set by the browser, so anything that is not a browser can
+ *    forge it. It buys you "a random scanner cannot write to your reports",
+ *    not "only your site can". It exists because a site with no backend has
+ *    nowhere to keep a token.
+ *
+ * A site with an empty allowlist is refused even in mode 2, because
+ * "authenticated by Origin" against a list that permits every origin is not
+ * authentication at all.
+ *
+ * @returns {{status: number, error: string} | null} null when allowed, or the
+ *   refusal to send back. A nullable result rather than a tagged union,
+ *   because there is exactly one success shape and it carries nothing.
+ */
+function ingestRefusal(req, origin, origins) {
+  const supplied = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+
+  if (config.ingestKey && supplied && safeEqual(supplied, config.ingestKey)) {
+    return null;
+  }
+
+  // A token was offered and did not match. Say so rather than falling through
+  // to the origin check, so a server with a stale token gets a clear 401
+  // instead of a confusing 403 about origins.
+  if (supplied) {
+    return { status: 401, error: 'invalid ingest token' };
+  }
+
+  if (!config.ingestAllowBrowser) {
+    return { status: 401, error: 'ingest requires a bearer token; post through your own backend' };
+  }
+  if (!origins || !origins.length) {
+    return { status: 403, error: 'browser ingest needs an origin allowlist for this site' };
+  }
+  if (!origin) {
+    return { status: 403, error: 'missing Origin' };
+  }
+  if (!origins.includes(origin) && !origins.includes('*')) {
+    return { status: 403, error: 'origin not allowed' };
+  }
+  return null;
 }
 
 let clientSource;
@@ -125,15 +179,20 @@ export async function handleCollector(req, res) {
       return true;
     }
 
-    // Re-resolve CORS from the body's slug when the query string omitted it,
-    // so a site with a restricted origin list is still enforced.
+    // Re-resolve from the body's slug when the query string omitted it, so a
+    // site's own allowlist is what gets enforced either way.
     const bodySlug = body && typeof body.site === 'string' ? body.site : '';
-    const effective = slug
-      ? cors
-      : corsHeaders(origin, bodySlug ? await allowedOrigins(bodySlug) : config.defaultOrigins);
+    const effectiveOrigins = slug
+      ? await allowedOrigins(slug)
+      : bodySlug
+        ? await allowedOrigins(bodySlug)
+        : config.defaultOrigins;
+    const effective = slug ? cors : corsHeaders(origin, effectiveOrigins);
 
-    if (origin && !effective['Access-Control-Allow-Origin']) {
-      json(res, 403, { error: 'origin not allowed' });
+    // Authorization before anything touches the database.
+    const refusal = ingestRefusal(req, origin, effectiveOrigins);
+    if (refusal) {
+      json(res, refusal.status, { error: refusal.error }, effective);
       return true;
     }
 
@@ -159,12 +218,37 @@ export async function handleCollector(req, res) {
   return false;
 }
 
-/** Warn once at startup about the configuration that is fine only locally. */
-export function warnOnOpenCors() {
-  if (!config.defaultOrigins.length) {
+/**
+ * Refuse to start a collector that would accept unauthenticated writes.
+ *
+ * A write endpoint on the public internet with no credential is not a
+ * configuration worth supporting, and the failure is invisible once it is
+ * running — the reports fill up and look fine.
+ *
+ * @returns {string[]} fatal problems; empty when the configuration is sound.
+ */
+export function ingestConfigProblems() {
+  const problems = [];
+  if (!config.ingestKey && !config.ingestAllowBrowser) {
+    problems.push(
+      'ingest has no credential. Set CLICKSTREAM_INGEST_KEY and have your site post ' +
+        'through its own backend, or set CLICKSTREAM_INGEST_ALLOW_BROWSER=true to accept ' +
+        'browser posts authenticated by Origin alone (weaker — see docs/security.md).'
+    );
+  }
+  if (config.ingestKey && config.ingestKey.length < 24) {
+    problems.push('CLICKSTREAM_INGEST_KEY is shorter than 24 characters. Generate one with `openssl rand -hex 32`.');
+  }
+  return problems;
+}
+
+/** Warn about the weaker mode being on, every start, so it stays visible. */
+export function warnOnBrowserIngest() {
+  if (config.ingestAllowBrowser) {
     console.warn(
-      '[clickstream] no CLICKSTREAM_ORIGINS set and sites may list none — events will be accepted from any origin. ' +
-        'Fine while wiring a site up; set per-site origins before production.'
+      '[clickstream] CLICKSTREAM_INGEST_ALLOW_BROWSER is on — browser posts are authenticated ' +
+        'by Origin alone, which anything that is not a browser can forge. Per-site origin ' +
+        'allowlists are required and enforced.'
     );
   }
 }

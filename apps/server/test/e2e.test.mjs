@@ -24,7 +24,7 @@ process.env.CLICKSTREAM_ADMIN_TOKEN = ADMIN_TOKEN;
 
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { loadClient, scratchDatabase, startServer, until, REPO_ROOT } from './helpers.mjs';
+import { loadClient, scratchDatabase, startServer, until, REPO_ROOT, INGEST_KEY } from './helpers.mjs';
 
 let db;
 let server;
@@ -76,7 +76,7 @@ test('the collector serves the browser client it is asked for', async () => {
 test('a shopper journey is captured, attributed and reported', async () => {
   const page = await loadClient({
     src: `${server.base}/c.js?site=shop`,
-    config: { endpoint: `${server.base}/collect`, flushInterval: 20, auto: false, autoClicks: false },
+    config: { endpoint: `${server.base}/api/clickstream`, flushInterval: 20, auto: false, autoClicks: false },
     path: '/'
   });
 
@@ -191,7 +191,7 @@ test('a shopper journey is captured, attributed and reported', async () => {
 test('a second visit from the same browser is the same shopper', async () => {
   const page = await loadClient({
     src: `${server.base}/c.js?site=shop`,
-    config: { endpoint: `${server.base}/collect`, flushInterval: 20, auto: false, autoClicks: false }
+    config: { endpoint: `${server.base}/api/clickstream`, flushInterval: 20, auto: false, autoClicks: false }
   });
 
   let anonymousId;
@@ -211,7 +211,7 @@ test('a second visit from the same browser is the same shopper', async () => {
   // second visit, which must not create a second shopper row.
   const res = await fetch(`${server.base}/collect`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${INGEST_KEY}` },
     body: JSON.stringify({
       site: 'shop',
       anonymousId,
@@ -235,7 +235,7 @@ test('a second visit from the same browser is the same shopper', async () => {
 test('a malformed event is refused and explained, without losing the batch', async () => {
   const res = await fetch(`${server.base}/collect`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${INGEST_KEY}` },
     body: JSON.stringify({
       site: 'shop',
       anonymousId: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
@@ -260,7 +260,7 @@ test('a malformed event is refused and explained, without losing the batch', asy
 test('an unknown site is refused rather than silently accepted', async () => {
   const res = await fetch(`${server.base}/collect`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${INGEST_KEY}` },
     body: JSON.stringify({
       site: 'not-a-site',
       anonymousId: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
@@ -332,7 +332,7 @@ test('report values are escaped, not injected', async () => {
   const nasty = '<img src=x onerror=alert(1)>';
   await fetch(`${server.base}/collect`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${INGEST_KEY}` },
     body: JSON.stringify({
       site: 'shop',
       anonymousId: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',

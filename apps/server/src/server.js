@@ -15,7 +15,7 @@
 
 import { createServer } from 'node:http';
 import { config, runsAdmin, runsCollector } from './config.js';
-import { warnOnOpenCors } from './collector.js';
+import { ingestConfigProblems, warnOnBrowserIngest } from './collector.js';
 import { handleRequest } from './router.js';
 import { closePool, query } from './db.js';
 import { migrate } from './migrate.js';
@@ -28,6 +28,17 @@ async function main() {
   if (!VALID_MODES.includes(config.mode)) {
     console.error(`[clickstream] MODE must be one of ${VALID_MODES.join(', ')} (got ${JSON.stringify(config.mode)})`);
     process.exit(1);
+  }
+
+  // A collector that would accept unauthenticated writes does not start. The
+  // failure is otherwise invisible: the reports fill up and look fine.
+  if (runsCollector()) {
+    const problems = ingestConfigProblems();
+    if (problems.length) {
+      for (const p of problems) console.error(`[clickstream] ${p}`);
+      process.exit(1);
+    }
+    warnOnBrowserIngest();
   }
 
   // Fail on a bad database before binding the port, so a misconfigured deploy
@@ -50,7 +61,6 @@ async function main() {
     process.exit(1);
   }
 
-  if (runsCollector()) warnOnOpenCors();
 
   // Half-configured gate: one of GATE_SITE / GATE_AUTH_URL without the other.
   // Refusing to start is the only safe response, because the failure mode is

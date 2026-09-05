@@ -86,6 +86,28 @@ export const config = {
     .filter(Boolean),
 
   /**
+   * Bearer token every event POST must carry.
+   *
+   * Ingest is a write endpoint on the public internet, so it is authenticated.
+   * The caller is expected to be a SERVER — the site proxies its shoppers'
+   * events through its own backend, which holds this token. That is the only
+   * arrangement in which ingest is genuinely authenticated, because a secret
+   * shipped to a browser is not a secret.
+   */
+  ingestKey: env('CLICKSTREAM_INGEST_KEY', ''),
+
+  /**
+   * Opt in to accepting posts straight from shoppers' browsers, authenticated
+   * by the `Origin` header against the site's allowlist and nothing else.
+   *
+   * This is weaker and the docs say so plainly: `Origin` is set by the browser
+   * and can be forged by anything that is not a browser. It exists because a
+   * site with no backend of its own has no way to hold a token, and it is
+   * off unless asked for — with a non-empty origin list required per site.
+   */
+  ingestAllowBrowser: bool('CLICKSTREAM_INGEST_ALLOW_BROWSER', false),
+
+  /**
    * Shared secret required on the admin. Absent means the admin refuses to
    * start unless CLICKSTREAM_ADMIN_OPEN is also set — a reports UI silently
    * listening on 0.0.0.0 with no auth is the failure mode most worth

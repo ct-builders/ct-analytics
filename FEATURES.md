@@ -96,6 +96,16 @@ against double installation, and appends the deferred script tag.
 ## Collector — `apps/server/src/`
 
 - `node:http` only; `pg` is the single runtime dependency
+- **Ingest is authenticated.** `POST /collect` requires a bearer token,
+  compared in constant time
+- Refuses to start with no credential, and refuses a key under 24 characters —
+  an open write endpoint fails invisibly, since the reports look normal
+- Opt-in browser-direct mode authenticated by `Origin` against a per-site
+  allowlist, which is required to be non-empty; warns on every start while on
+- Distinct refusals: 401 for a token problem, 403 for an origin problem, so a
+  silent analytics failure is diagnosable
+- Authorization runs before the database is touched, so a refused write leaves
+  no shopper or session row
 - `POST /collect` with per-site CORS, a 60-second origin cache, and preflight
 - `GET /c.js` and `/clickstream.js` serving the client with a 5-minute cache
 - `GET /snippet.js`
@@ -130,6 +140,9 @@ Read-only; no route writes anything.
 - Generic renderer driven by column type: text, number, money, percent, date,
   code, journey link
 - Server-rendered HTML, inline CSS, light theme, no client framework
+- Optional shared-password gate; a satisfied gate is sufficient authorization,
+  so there is one secret to distribute rather than two
+- Gate half-configured (one of `GATE_SITE` / `GATE_AUTH_URL`) refuses to start
 - Constant-time admin token comparison; refuses all requests when unconfigured
 - HTML escaping on every value, plus a restrictive `Content-Security-Policy`
 - Currency-aware money formatting from minor units
@@ -171,8 +184,9 @@ Read-only; no route writes anything.
   of a full page navigation; queue, batching, beacon-on-hide, hashing,
   de-duplication, all three integration levels, hostile storage, failing
   transport
-- `apps/server` (25) — row mapping, session upsert, order-line splitting, batch
-  ordering, rejection logging, plus an end-to-end suite that boots the
+- `apps/server` (60) — ingest authorization matrix, the gate, row mapping,
+  session upsert, order-line splitting, batch ordering, rejection logging, plus
+  an end-to-end suite that boots the
   collector, evaluates the real `clickstream.js` in a browser-shaped scope, drives
   a shopper journey over HTTP into Postgres, and reads the numbers back through
   the real reports
