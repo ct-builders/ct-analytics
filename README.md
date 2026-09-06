@@ -69,7 +69,10 @@ clickstream.orderSubmit({
 });
 ```
 
-Full details in [docs/install.md](docs/install.md).
+**[INSTRUMENTATION.md](INSTRUMENTATION.md)** is the guide to wiring up a site:
+every event, what each one must carry, the markup attributes, and the ordering
+rule that makes discovery attribution work. [docs/install.md](docs/install.md)
+covers standing up the collector itself.
 
 ## What makes it different from a page-view counter
 

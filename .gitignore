@@ -10,3 +10,8 @@ coverage/
 # Traffic-generator run artifacts. The action log is per-run ground
 # truth, not something to carry in the repo.
 tools/traffic/log/
+
+# Where this project's internal Confluence page is written and published
+# from. A pointer to a local path and an internal page id, so it stays out
+# of a public repository.
+.confluence-source
