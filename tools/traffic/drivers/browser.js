@@ -425,6 +425,15 @@ export async function perform(page, base, profile, step, session, lastClick = {}
       // empty — costing the result click, the product view, and every
       // attribution field that hangs off them.
       await cards.first().waitFor({ state: 'attached', timeout: 8000 }).catch(() => {});
+      // A sort, facet or search step just before this one keeps the OLD
+      // cards on screen while the new list loads in the background — the
+      // "attached" wait above is satisfied by content about to be replaced.
+      // Reading href and clicking straddle that swap: the href we log comes
+      // from the old card, the click can land on the new one, so the
+      // network event lost its onClick entirely or the reconciler sees a
+      // click that doesn't match what was logged. Settling here closes that
+      // window instead of racing it.
+      await page.waitForLoadState('networkidle', { timeout: 4000 }).catch(() => {});
       const count = await cards.count();
       if (!count) return `no result cards at ${pathAndQuery(page)}`;
       // The rank the script asked for, or the last card if the real listing is
