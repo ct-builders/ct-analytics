@@ -410,6 +410,17 @@ export async function perform(page, base, profile, step, session, lastClick = {}
           { timeout: 4000 }
         )
         .catch(() => {});
+      // The URL updating is not the same as the facet section's own re-render
+      // landing: that is an async server-rendered refetch behind it, and the
+      // chip can still be painted from the PREVIOUS render — with the STALE
+      // `currentValue` its onClick closure captured — for a moment after the
+      // URL already says otherwise. A removeFacet that clicks into that
+      // window re-reads the pre-click value and reapplies instead of
+      // removing, which is why apply_facet came in doubled and facet_remove
+      // never arrived at all. The chip's active class is driven by that same
+      // `currentValue`, so waiting for IT to flip is waiting for the exact
+      // state the next click's closure will see.
+      await waitForChipState(chip, applying).catch(() => {});
       await dwell('default');
       return true;
     }
@@ -517,6 +528,14 @@ export async function perform(page, base, profile, step, session, lastClick = {}
         if (lastClick.sku && lastClick.sku === step.product?.sku) step.rank = lastClick.rank;
         return true;
       }
+      // A rank here was meant to pair with the clickResult that should have
+      // just landed on this page — but we are about to navigate there
+      // directly, which means that click was skipped (a card that never
+      // rendered, a listing that never loaded) rather than performed. Holding
+      // the tracking to a source_position from a click that never happened
+      // reports attribution as lost for a view that was never a listing click
+      // in the first place.
+      if (step.rank !== undefined) step.rank = undefined;
       await go(
         page,
         base + pathFor(profile, 'product', { slug: step.product.slug, sku: step.product.sku })
@@ -636,6 +655,26 @@ export function productFromPath(pathOrUrl) {
 function correctedProduct(profile, predicted, observed) {
   const full = profile.products?.find((p) => p.sku === observed.sku);
   return full ? { ...full } : { ...predicted, ...observed };
+}
+
+/**
+ * Poll a facet chip's own active class instead of trusting the URL alone.
+ *
+ * `bg-charcoal` is the active style every renderer this selector can reach
+ * (pill, toggle) uses, and it is driven by the exact same `currentValue` the
+ * chip's onClick closure reads — so waiting for it is waiting for the state
+ * that determines whether the NEXT click applies or removes.
+ */
+async function waitForChipState(chip, active, timeout = 4000) {
+  const deadline = Date.now() + timeout;
+  while (Date.now() < deadline) {
+    const isActive = await chip
+      .evaluate((el) => el.className.includes('bg-charcoal'))
+      .catch(() => null);
+    if (isActive === active) return true;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  return false;
 }
 
 function pathnameOf(url) {

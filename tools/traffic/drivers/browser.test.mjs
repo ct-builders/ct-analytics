@@ -65,6 +65,32 @@ test('a standalone view navigates instead of re-reporting whatever page it is al
   assert.equal(step.product.sku, 'MGD-01');
 });
 
+test('a standalone view clears a stale rank when its paired click was skipped', async () => {
+  // clickResult can be skipped — a card that never rendered, a listing that
+  // never loaded — leaving the viewProduct step right behind it still
+  // carrying the rank the script predicted for the click that never
+  // happened. Landing here directly is a real view, but it was never a
+  // listing click: holding the tracking to a source_position that could
+  // never have been recorded reports attribution as lost for a view that was
+  // tracked exactly right.
+  const page = fakePage('https://x/');
+  const step = {
+    t: 'viewProduct',
+    rank: 2,
+    product: { sku: 'MUTB-01', slug: 'modern-upholstered-twin-bed' }
+  };
+
+  const result = await perform(page, 'https://x', profile, step, {}, {});
+
+  assert.equal(result, true);
+  assert.deepEqual(page.gotoCalls, ['https://x/en-us/modern-upholstered-twin-bed/p/MUTB-01']);
+  assert.equal(
+    step.rank,
+    undefined,
+    'no real click preceded this view, so there is no position left to attribute'
+  );
+});
+
 test('a standalone view corrects its sku from a live catalog that redirected elsewhere', async () => {
   const page = fakePage('https://x/en-us/rustic-country-dresser/p/RCD-01', {
     redirectTo: 'https://x/en-us/modern-bookcase/p/MB-0973'
@@ -270,6 +296,12 @@ test('a facet click waits for the URL to actually reflect the toggle before the 
         },
         async click() {
           calls.push('chip.click');
+        },
+        // Already showing the removed (inactive) class, so the class-based
+        // wait this step also does settles immediately and does not mask
+        // what this test is actually proving about the URL wait's ordering.
+        async evaluate(fn) {
+          return fn({ className: 'border-border text-charcoal-light' });
         }
       };
     }
@@ -320,7 +352,12 @@ test('an applyFacet step waits for the URL to actually gain the value, not lose 
         async count() {
           return 1;
         },
-        async click() {}
+        async click() {},
+        // Already showing the applied (active) class, for the same reason as
+        // the removeFacet test above.
+        async evaluate(fn) {
+          return fn({ className: 'bg-charcoal border-charcoal text-white' });
+        }
       };
     }
   };
@@ -342,6 +379,57 @@ test('an applyFacet step waits for the URL to actually gain the value, not lose 
     predicate(new URL('https://x/c?eco-claims=low-voc-finish')),
     true,
     'settled once the apply actually committed'
+  );
+});
+
+test('a facet click waits for its own chip to render the applied/removed class, not just the URL', async () => {
+  // The URL updates as soon as the client router pushes it, but the facet
+  // section behind it is an async re-render — the chip can still be painted
+  // from the previous render, with the STALE currentValue its onClick
+  // closure captured, for a moment after the URL already says otherwise. A
+  // removeFacet that clicks into that window reapplies instead of removing.
+  // This proves the wait actually polls the chip's own class rather than
+  // returning as soon as the URL settles.
+  let evaluateCount = 0;
+  const page = {
+    url: () => 'https://x/en-us/category/dressers',
+    async waitForLoadState() {},
+    async waitForTimeout() {},
+    async waitForURL() {},
+    locator() {
+      return {
+        first() {
+          return this;
+        },
+        async waitFor() {},
+        async count() {
+          return 1;
+        },
+        async click() {},
+        // Still shows the applied (active) class for the first poll,
+        // simulating the async re-render landing a beat after the click —
+        // and only flips on a later poll.
+        async evaluate(fn) {
+          evaluateCount++;
+          const className =
+            evaluateCount >= 2 ? 'border-border text-charcoal-light' : 'bg-charcoal border-charcoal text-white';
+          return fn({ className });
+        }
+      };
+    }
+  };
+  const profileWithSelectors = {
+    ...profile,
+    selectors: { facetChip: "button:has-text('{value}')" }
+  };
+  const step = { t: 'removeFacet', name: 'eco-claims', value: 'low-voc-finish' };
+
+  const result = await perform(page, 'https://x', profileWithSelectors, step, {});
+
+  assert.equal(result, true);
+  assert.ok(
+    evaluateCount >= 2,
+    'polls the chip more than once, waiting for its own class to actually flip rather than trusting the first read'
   );
 });
 
