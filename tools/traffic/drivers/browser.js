@@ -481,6 +481,18 @@ export async function perform(page, base, profile, step, session, lastClick = {}
 
       await card.click({ force: true });
       await page.waitForLoadState('domcontentloaded').catch(() => {});
+      // The PDP is an async server component that awaits the product fetch
+      // before it can stream `TrackEvent` to the client, so `product_view`
+      // has not fired yet at domcontentloaded — commonly a second or more
+      // behind it against a live catalog. Racing straight into the next
+      // clickResult's goBack leaves this page before its own view ever
+      // mounted, dropping product_view for a page that was genuinely
+      // visited. A control that only renders once the product data has
+      // arrived — the same data TrackEvent needs — is the real signal,
+      // the way waitForURL replaced networkidle for the facet race.
+      if (sel?.addToCart) {
+        await page.locator(sel.addToCart).first().waitFor({ state: 'attached', timeout: 8000 }).catch(() => {});
+      }
       await dwell('viewProduct');
       return true;
     }
@@ -513,6 +525,13 @@ export async function perform(page, base, profile, step, session, lastClick = {}
       // landed URL is the ground truth, the same correction clickResult applies.
       const landed = productFromPath(page.url());
       if (landed) step.product = { ...step.product, ...landed };
+      // Same race as the clickResult-paired view: the PDP's own
+      // `product_view` has not fired yet at domcontentloaded, and a
+      // standalone view can be followed immediately by another navigation
+      // (a companion view, a direct addToCart).
+      if (sel?.addToCart) {
+        await page.locator(sel.addToCart).first().waitFor({ state: 'attached', timeout: 8000 }).catch(() => {});
+      }
       await dwell('viewProduct');
       return true;
     }
