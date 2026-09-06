@@ -309,7 +309,7 @@ async function go(page, url) {
  * reason it could not be — which goes in the log, so a broken selector reads
  * differently from a facet that was never on this listing.
  */
-async function perform(page, base, profile, step, session, lastClick = {}, cart = { units: 0 }) {
+export async function perform(page, base, profile, step, session, lastClick = {}, cart = { units: 0 }) {
   const sel = profile.selectors;
   const dwell = async (kind) => {
     const [lo, hi] = DWELL[kind] || DWELL.default;
@@ -461,9 +461,17 @@ async function perform(page, base, profile, step, session, lastClick = {}, cart 
     }
 
     case 'viewProduct': {
-      // A clickResult immediately before this already navigated here, and the
-      // product view fires on render — so re-navigating would double-count it.
-      if (page.url().includes('/p/')) {
+      // Only a listing-paired view — behaviour.js always attaches `rank` to
+      // the viewProduct that immediately follows a clickResult — can trust
+      // "already on a /p/ page" to mean the click just landed here. A
+      // standalone view (the direct-mode landing, or the second-line
+      // companion that follows an addToCart) carries no rank, and the page
+      // is frequently still sitting on a DIFFERENT product's detail page —
+      // addToCart does not navigate away. Taking the shortcut there
+      // re-reports whatever product is already on screen instead of
+      // visiting the one the script asked for, which drops the real view
+      // and makes the addToCart step that follows add the wrong item again.
+      if (step.rank !== undefined && page.url().includes('/p/')) {
         // Correct the step to whatever the page actually is, for the same
         // reason clickResult does: the URL is the truth, the script was a
         // prediction.
@@ -476,6 +484,10 @@ async function perform(page, base, profile, step, session, lastClick = {}, cart 
         page,
         base + pathFor(profile, 'product', { slug: step.product.slug, sku: step.product.sku })
       );
+      // The live catalog may not match the profile's static prediction — the
+      // landed URL is the ground truth, the same correction clickResult applies.
+      const landedSku = /\/p\/([^/?#]+)/.exec(page.url())?.[1];
+      if (landedSku) step.product = { ...step.product, sku: decodeURIComponent(landedSku) };
       await dwell('viewProduct');
       return true;
     }
