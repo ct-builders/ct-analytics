@@ -141,6 +141,57 @@ test('a corrected sku pulls its whole record from the catalog, not just the sku/
   });
 });
 
+test('correcting a product mutates it in place, so a basket line that shares the same object sees the correction too', async () => {
+  // behaviour.js builds its cart as `cart.push({ product: chosen, quantity })`
+  // where `chosen` is the SAME object reference the addToCart step's own
+  // `product` field points to — the checkout/placeOrder steps read that cart
+  // array later to report what the basket holds. If the driver corrects a
+  // mispredicted addToCart by reassigning `step.product` to a brand-new
+  // object, the cart's copy of the reference is left pointing at the stale,
+  // uncorrected prediction — so checkout/placeOrder report a sku that was
+  // never actually added. Mutating the shared object in place is what makes
+  // the cart's own reference reflect the correction.
+  const catalogProfile = {
+    ...profile,
+    products: [{ sku: 'WCS-09', slug: 'walnut-cabinet', name: 'Walnut Cabinet', priceCents: 159900 }],
+    selectors: { addToCart: "button:has-text('Add to Cart')" }
+  };
+  const predicted = { sku: 'IQB-09', slug: 'serenity-queen-bed', name: 'Serenity Queen Bed', priceCents: 99900 };
+  // Mirrors behaviour.js: the cart line and the addToCart step alias the
+  // same product object, exactly like `cart.push({ product: chosen, ... })`
+  // and `say('addToCart', { product: chosen, ... })` do.
+  const cartLine = { product: predicted, quantity: 1 };
+  const step = { t: 'addToCart', product: predicted, quantity: 1 };
+  const page = {
+    url: () => 'https://x/en-us/walnut-cabinet/p/WCS-09',
+    async waitForLoadState() {},
+    async waitForTimeout() {},
+    locator() {
+      return {
+        first() {
+          return this;
+        },
+        async waitFor() {},
+        async count() {
+          return 1;
+        },
+        async scrollIntoViewIfNeeded() {},
+        async click() {}
+      };
+    }
+  };
+
+  await perform(page, 'https://x', catalogProfile, step, {}, {}, { units: 0 });
+
+  assert.equal(step.product.sku, 'WCS-09', 'the addToCart step itself is corrected');
+  assert.equal(
+    cartLine.product.sku,
+    'WCS-09',
+    'the basket line aliasing the same object sees the correction, not the stale prediction'
+  );
+  assert.equal(cartLine.product, step.product, 'still the same object reference, not a detached copy');
+});
+
 test('a result click settles the listing before reading or clicking a card, closing the window where a sort/facet swap in flight could be raced', async () => {
   // A card matching "attached" is not proof the listing has finished
   // changing — a sort/facet/search step just before this one keeps its OLD
