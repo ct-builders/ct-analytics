@@ -84,6 +84,70 @@ test('a standalone view corrects its sku from a live catalog that redirected els
   );
 });
 
+test('a result click settles the listing before reading or clicking a card, closing the window where a sort/facet swap in flight could be raced', async () => {
+  // A card matching "attached" is not proof the listing has finished
+  // changing — a sort/facet/search step just before this one keeps its OLD
+  // cards on screen while the new list loads. This fake never removes its
+  // one card, so the test cannot see staleness directly; what it CAN prove
+  // is the ordering the fix depends on: settle on network idle before
+  // trusting `count()`/`getAttribute()`/`click()` at all.
+  const calls = [];
+  const cardHref = '/en-us/walnut-cabinet/p/WCS-09';
+  const page = {
+    url: () => 'https://x/en-us/search?q=cabinet',
+    async waitForLoadState(state) {
+      calls.push(`waitForLoadState:${state ?? 'load'}`);
+    },
+    async waitForTimeout() {},
+    async goBack() {
+      calls.push('goBack');
+    },
+    locator() {
+      return {
+        first() {
+          return this;
+        },
+        async waitFor() {
+          calls.push('cards.waitFor:attached');
+        },
+        async count() {
+          return 1;
+        },
+        nth() {
+          return {
+            async getAttribute() {
+              calls.push('card.getAttribute');
+              return cardHref;
+            },
+            async click() {
+              calls.push('card.click');
+            }
+          };
+        }
+      };
+    }
+  };
+  const profileWithSelectors = {
+    ...profile,
+    selectors: { resultCard: "a[href*='/p/']" }
+  };
+  const step = { t: 'clickResult', rank: 1, product: { sku: 'SCG-09' } };
+  const lastClick = {};
+
+  const result = await perform(page, 'https://x', profileWithSelectors, step, {}, lastClick);
+
+  assert.equal(result, true);
+  assert.equal(step.product.sku, 'WCS-09', 'still corrects from what is actually on the card');
+  const settleIndex = calls.indexOf('waitForLoadState:networkidle');
+  const readIndex = calls.indexOf('card.getAttribute');
+  const clickIndex = calls.indexOf('card.click');
+  assert.notEqual(settleIndex, -1, 'settles on network idle before trusting the listing');
+  assert.ok(
+    settleIndex < readIndex && settleIndex < clickIndex,
+    'settles BEFORE reading or clicking the card, not after — otherwise both still race the swap'
+  );
+});
+
 test('productFromPath extracts slug and sku together, not just the sku half', () => {
   assert.deepEqual(productFromPath('/en-us/walnut-cabinet/p/WCS-09'), {
     slug: 'walnut-cabinet',
