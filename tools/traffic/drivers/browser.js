@@ -393,14 +393,23 @@ export async function perform(page, base, profile, step, session, lastClick = {}
       await chip.waitFor({ state: 'attached', timeout: 3000 }).catch(() => {});
       if (!(await chip.count())) return `no facet control for ${step.name}=${step.value}`;
       await chip.click();
-      // The click is a client-side transition, not a full navigation, so
-      // `domcontentloaded` resolves immediately and proves nothing. Without
-      // settling here, a removeFacet step right after an applyFacet can
-      // click the SAME chip before React has committed the toggled state —
-      // the handler still reads the pre-click value and reapplies instead
-      // of removing, which is why apply_facet came in doubled and
-      // facet_remove never arrived at all.
-      await page.waitForLoadState('networkidle', { timeout: 4000 }).catch(() => {});
+      // The click is a client-side transition: the pill's onClick reads
+      // currentValue from useSearchParams() at render time, so a removeFacet
+      // step right after an applyFacet step must wait for the URL to actually
+      // carry the applied value before clicking again — otherwise it still
+      // sees the pre-click (unapplied) value and reapplies instead of
+      // removing, which is why apply_facet came in doubled and facet_remove
+      // never arrived at all. `networkidle` doesn't catch this: re-visiting a
+      // query the Next.js router already cached (e.g. the no-facet listing)
+      // resolves with no network activity at all, so "idle" fires immediately
+      // and proves nothing about whether React has re-rendered.
+      const applying = step.t === 'applyFacet';
+      await page
+        .waitForURL(
+          (url) => (url.searchParams.get(step.name) === step.value) === applying,
+          { timeout: 4000 }
+        )
+        .catch(() => {});
       await dwell('default');
       return true;
     }

@@ -148,19 +148,25 @@ test('a result click settles the listing before reading or clicking a card, clos
   );
 });
 
-test('a facet click settles on network idle before the next step can click the same chip', async () => {
+test('a facet click waits for the URL to actually reflect the toggle before the next step can click the same chip', async () => {
   // applyFacet and removeFacet share one selector — the same chip toggles
   // both ways. A removeFacet step right after applyFacet clicks that chip
-  // again before its own step returns, so if THIS click does not settle
-  // first, the next click can land while React is still on the pre-click
-  // render and read the wrong toggle state.
+  // again before its own step returns, so if this click does not wait for
+  // the URL to actually drop the applied value, the next click can land
+  // while the pill's onClick is still reading the pre-click (still-applied)
+  // searchParams — it sees "applied" again and reapplies instead of
+  // removing. Waiting on network idle does not catch this: a cached RSC
+  // segment resolves with no network activity at all.
   const calls = [];
+  let capturedPredicate;
   const page = {
     url: () => 'https://x/en-us/category/dressers?eco-claims=low-voc-finish',
-    async waitForLoadState(state) {
-      calls.push(`waitForLoadState:${state ?? 'load'}`);
-    },
+    async waitForLoadState() {},
     async waitForTimeout() {},
+    async waitForURL(predicate) {
+      calls.push('waitForURL');
+      capturedPredicate = predicate;
+    },
     locator() {
       return {
         first() {
@@ -188,11 +194,64 @@ test('a facet click settles on network idle before the next step can click the s
 
   assert.equal(result, true);
   const clickIndex = calls.indexOf('chip.click');
-  const settleIndex = calls.indexOf('waitForLoadState:networkidle');
-  assert.notEqual(settleIndex, -1, 'settles on network idle after the click');
+  const waitIndex = calls.indexOf('waitForURL');
+  assert.notEqual(waitIndex, -1, 'waits for the URL to reflect the removal after the click');
   assert.ok(
-    clickIndex < settleIndex,
-    'settles AFTER clicking, before returning — otherwise the next facet step can race this one'
+    clickIndex < waitIndex,
+    'waits AFTER clicking, before returning — otherwise the next facet step can race this one'
+  );
+  assert.equal(
+    capturedPredicate(new URL('https://x/c?eco-claims=low-voc-finish')),
+    false,
+    'not settled while the facet is still applied'
+  );
+  assert.equal(
+    capturedPredicate(new URL('https://x/c')),
+    true,
+    'settled once the param is actually gone — the real signal removal committed'
+  );
+});
+
+test('an applyFacet step waits for the URL to actually gain the value, not lose it', async () => {
+  const page = {
+    url: () => 'https://x/en-us/category/dressers',
+    async waitForLoadState() {},
+    async waitForTimeout() {},
+    waitForURLCalls: [],
+    async waitForURL(predicate) {
+      this.waitForURLCalls.push(predicate);
+    },
+    locator() {
+      return {
+        first() {
+          return this;
+        },
+        async waitFor() {},
+        async count() {
+          return 1;
+        },
+        async click() {}
+      };
+    }
+  };
+  const profileWithSelectors = {
+    ...profile,
+    selectors: { facetChip: "button:has-text('{value}')" }
+  };
+  const step = { t: 'applyFacet', name: 'eco-claims', value: 'low-voc-finish' };
+
+  await perform(page, 'https://x', profileWithSelectors, step, {});
+
+  const predicate = page.waitForURLCalls[0];
+  assert.equal(
+    predicate(new URL('https://x/c')),
+    false,
+    'not settled until the value actually shows up in the URL'
+  );
+  assert.equal(
+    predicate(new URL('https://x/c?eco-claims=low-voc-finish')),
+    true,
+    'settled once the apply actually committed'
   );
 });
 
