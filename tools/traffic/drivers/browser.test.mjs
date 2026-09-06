@@ -6,7 +6,7 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { perform } from './browser.js';
+import { perform, productFromPath } from './browser.js';
 
 const profile = {
   paths: { product: '/en-us/{slug}/p/{sku}' }
@@ -77,4 +77,21 @@ test('a standalone view corrects its sku from a live catalog that redirected els
   await perform(page, 'https://x', profile, step, {}, {});
 
   assert.equal(step.product.sku, 'MB-0973', 'the landed page is the ground truth, not the prediction');
+  assert.equal(
+    step.product.slug,
+    'modern-bookcase',
+    'the redirect changed both halves of the pair, not just the sku'
+  );
+});
+
+test('productFromPath extracts slug and sku together, not just the sku half', () => {
+  assert.deepEqual(productFromPath('/en-us/walnut-cabinet/p/WCS-09'), {
+    slug: 'walnut-cabinet',
+    sku: 'WCS-09'
+  });
+  assert.deepEqual(
+    productFromPath('https://x/en-us/amalia-rug/p/AMR-09?ref=nav'),
+    { slug: 'amalia-rug', sku: 'AMR-09' }
+  );
+  assert.equal(productFromPath('/en-us/cart'), null);
 });

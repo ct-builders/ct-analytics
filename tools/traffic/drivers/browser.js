@@ -442,9 +442,9 @@ export async function perform(page, base, profile, step, session, lastClick = {}
       //
       // What the driver observed in the page IS the ground truth.
       const href = (await card.getAttribute('href').catch(() => null)) || '';
-      const observedSku = /\/p\/([^/?#]+)/.exec(href)?.[1];
-      if (observedSku) {
-        step.product = { ...step.product, sku: decodeURIComponent(observedSku) };
+      const observed = productFromPath(href);
+      if (observed) {
+        step.product = { ...step.product, ...observed };
       }
       step.rank = index + 1;
       // The product view that follows is a separate step carrying the same
@@ -475,8 +475,8 @@ export async function perform(page, base, profile, step, session, lastClick = {}
         // Correct the step to whatever the page actually is, for the same
         // reason clickResult does: the URL is the truth, the script was a
         // prediction.
-        const sku = /\/p\/([^/?#]+)/.exec(page.url())?.[1];
-        if (sku) step.product = { ...step.product, sku: decodeURIComponent(sku) };
+        const observed = productFromPath(page.url());
+        if (observed) step.product = { ...step.product, ...observed };
         if (lastClick.sku && lastClick.sku === step.product?.sku) step.rank = lastClick.rank;
         return true;
       }
@@ -486,8 +486,8 @@ export async function perform(page, base, profile, step, session, lastClick = {}
       );
       // The live catalog may not match the profile's static prediction — the
       // landed URL is the ground truth, the same correction clickResult applies.
-      const landedSku = /\/p\/([^/?#]+)/.exec(page.url())?.[1];
-      if (landedSku) step.product = { ...step.product, sku: decodeURIComponent(landedSku) };
+      const landed = productFromPath(page.url());
+      if (landed) step.product = { ...step.product, ...landed };
       await dwell('viewProduct');
       return true;
     }
@@ -565,6 +565,19 @@ export async function perform(page, base, profile, step, session, lastClick = {}
     default:
       return `no driver support for step "${step.t}"`;
   }
+}
+
+// A product's slug and sku travel together in the URL as `/{slug}/p/{sku}`.
+// Correcting one from an observed href/URL without the other leaves a
+// mismatched pair — the real sku from wherever the click actually landed,
+// paired with the slug the profile predicted before the listing sorted or
+// the catalog drifted. That pair never fires as a single tracked event, so
+// it reads as tracking dropping the click instead of the driver logging a
+// product that doesn't exist.
+export function productFromPath(pathOrUrl) {
+  const match = /\/([^/?#]+)\/p\/([^/?#]+)/.exec(pathOrUrl);
+  if (!match) return null;
+  return { slug: decodeURIComponent(match[1]), sku: decodeURIComponent(match[2]) };
 }
 
 function pathnameOf(url) {
