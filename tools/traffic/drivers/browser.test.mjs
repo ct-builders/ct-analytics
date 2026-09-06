@@ -84,6 +84,37 @@ test('a standalone view corrects its sku from a live catalog that redirected els
   );
 });
 
+test('a corrected sku pulls its whole record from the catalog, not just the sku/slug pair', async () => {
+  // Merging only {sku, slug} onto the profile's stale prediction leaves a
+  // Frankenstein product: the real identity paired with a name, price and
+  // category that belong to whatever the profile guessed would be at this
+  // rank. That inconsistent pair never matches what the storefront tracked.
+  const catalogProfile = {
+    ...profile,
+    products: [
+      { sku: 'MGD-01', slug: 'modern-glam-dresser', name: 'Modern Glam Dresser', priceCents: 45900 },
+      { sku: 'MB-0973', slug: 'modern-bookcase', name: 'Modern Bookcase', priceCents: 21900, categoryPath: 'storage' }
+    ]
+  };
+  const page = fakePage('https://x/en-us/rustic-country-dresser/p/RCD-01', {
+    redirectTo: 'https://x/en-us/modern-bookcase/p/MB-0973'
+  });
+  const step = {
+    t: 'viewProduct',
+    product: { sku: 'MGD-01', slug: 'modern-glam-dresser', name: 'Modern Glam Dresser', priceCents: 45900 }
+  };
+
+  await perform(page, 'https://x', catalogProfile, step, {}, {});
+
+  assert.deepEqual(step.product, {
+    sku: 'MB-0973',
+    slug: 'modern-bookcase',
+    name: 'Modern Bookcase',
+    priceCents: 21900,
+    categoryPath: 'storage'
+  });
+});
+
 test('a result click settles the listing before reading or clicking a card, closing the window where a sort/facet swap in flight could be raced', async () => {
   // A card matching "attached" is not proof the listing has finished
   // changing — a sort/facet/search step just before this one keeps its OLD
