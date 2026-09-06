@@ -469,7 +469,7 @@ export async function perform(page, base, profile, step, session, lastClick = {}
       const href = (await card.getAttribute('href').catch(() => null)) || '';
       const observed = productFromPath(href);
       if (observed) {
-        step.product = { ...step.product, ...observed };
+        step.product = correctedProduct(profile, step.product, observed);
       }
       step.rank = index + 1;
       // The product view that follows is a separate step carrying the same
@@ -513,7 +513,7 @@ export async function perform(page, base, profile, step, session, lastClick = {}
         // reason clickResult does: the URL is the truth, the script was a
         // prediction.
         const observed = productFromPath(page.url());
-        if (observed) step.product = { ...step.product, ...observed };
+        if (observed) step.product = correctedProduct(profile, step.product, observed);
         if (lastClick.sku && lastClick.sku === step.product?.sku) step.rank = lastClick.rank;
         return true;
       }
@@ -524,7 +524,7 @@ export async function perform(page, base, profile, step, session, lastClick = {}
       // The live catalog may not match the profile's static prediction — the
       // landed URL is the ground truth, the same correction clickResult applies.
       const landed = productFromPath(page.url());
-      if (landed) step.product = { ...step.product, ...landed };
+      if (landed) step.product = correctedProduct(profile, step.product, landed);
       // Same race as the clickResult-paired view: the PDP's own
       // `product_view` has not fired yet at domcontentloaded, and a
       // standalone view can be followed immediately by another navigation
@@ -549,7 +549,7 @@ export async function perform(page, base, profile, step, session, lastClick = {}
       // Same correction clickResult/viewProduct already apply, so the
       // reconciler is held to what happened rather than what was guessed.
       const sku = /\/p\/([^/?#]+)/.exec(page.url())?.[1];
-      if (sku) step.product = { ...step.product, sku: decodeURIComponent(sku) };
+      if (sku) step.product = correctedProduct(profile, step.product, { sku: decodeURIComponent(sku) });
 
       // One click adds one unit, whatever the script asked for. Holding the
       // tracking to a quantity the driver never entered reports a field error
@@ -622,6 +622,20 @@ export function productFromPath(pathOrUrl) {
   const match = /\/([^/?#]+)\/p\/([^/?#]+)/.exec(pathOrUrl);
   if (!match) return null;
   return { slug: decodeURIComponent(match[1]), sku: decodeURIComponent(match[2]) };
+}
+
+// Merging just the observed sku/slug onto the profile's original prediction
+// leaves the rest of the record — name, price, category, attrs — stuck on
+// whatever product the profile guessed would be at this rank. Once the live
+// listing doesn't match that guess, the "corrected" step ends up with one
+// product's identity and another's details: a pair that never matches what
+// the storefront actually tracked, and reads as a wrong field for a click
+// the driver's own correction should have gotten right. The profile's
+// catalog is keyed by sku, so the observed sku is enough to pull the whole,
+// consistent record back out of it.
+function correctedProduct(profile, predicted, observed) {
+  const full = profile.products?.find((p) => p.sku === observed.sku);
+  return full ? { ...full } : { ...predicted, ...observed };
 }
 
 function pathnameOf(url) {
