@@ -652,9 +652,26 @@ export function productFromPath(pathOrUrl) {
 // the driver's own correction should have gotten right. The profile's
 // catalog is keyed by sku, so the observed sku is enough to pull the whole,
 // consistent record back out of it.
+//
+// Mutates `predicted` in place rather than returning a fresh object.
+// behaviour.js's cart array holds the SAME product object it hands to the
+// addToCart/clickResult step — `cart.push({ product: chosen, ... })` — so a
+// checkout or placeOrder step reads that identical reference later.
+// Reassigning `step.product` to a new object only fixes the one step that
+// called this; the cart's copy of the reference still points at the old,
+// uncorrected prediction, so checkout/placeOrder report a sku that was never
+// actually added. Mutating the shared object means every reference to it —
+// the step that corrected it, and the cart line that aliases it — sees the
+// same, real product.
 function correctedProduct(profile, predicted, observed) {
   const full = profile.products?.find((p) => p.sku === observed.sku);
-  return full ? { ...full } : { ...predicted, ...observed };
+  const replacement = full ? { ...full } : { ...predicted, ...observed };
+  if (predicted && typeof predicted === 'object') {
+    for (const key of Object.keys(predicted)) delete predicted[key];
+    Object.assign(predicted, replacement);
+    return predicted;
+  }
+  return replacement;
 }
 
 /**
