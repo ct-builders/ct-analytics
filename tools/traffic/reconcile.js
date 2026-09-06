@@ -40,7 +40,11 @@ function args(argv) {
   return out;
 }
 
-const a = args(process.argv);
+// Only the CLI entry point parses argv and can exit the process — importing
+// this module (the test suite does, for `reconcileSession`) must not.
+const isMain = import.meta.url === `file://${process.argv[1]}`;
+
+const a = isMain ? args(process.argv) : {};
 const opts = {
   log: a.log,
   admin: (a.admin || process.env.CLICKSTREAM_ADMIN_URL || '').replace(/\/+$/, ''),
@@ -52,7 +56,7 @@ const opts = {
   since: a.since || ''
 };
 
-if (!opts.log || a.help) {
+if (isMain && (!opts.log || a.help)) {
   console.log(`
 Compare an action log against what the tracking captured.
 
@@ -183,7 +187,7 @@ const STEP_FOR_EVENT = {
   order_submit: 'placeOrder'
 };
 
-function reconcileSession(record, captured) {
+export function reconcileSession(record, captured) {
   /** @type {{level: string, message: string}[]} */
   const findings = [];
 
@@ -235,8 +239,16 @@ function reconcileSession(record, captured) {
 
   // 2. Fields, matching each expected step against the captured events of
   //    that type in order.
+  //
+  // Walks `performedSteps` (what the driver actually got through) rather than
+  // `steps` (the full intent) when it is available. A skipped step of the same
+  // kind ahead of a real one — a facet the live listing never offered, a
+  // control that moved — would otherwise shift every later comparison by one
+  // slot and blame the tracking for a value it was never given the chance to
+  // record.
+  const stepSource = record.performedSteps ?? record.steps;
   for (const [eventType, stepKind] of Object.entries(STEP_FOR_EVENT)) {
-    const steps = record.steps.filter((s) => s.t === stepKind);
+    const steps = stepSource.filter((s) => s.t === stepKind);
     const events = captured.events.filter((e) => e.type === eventType);
     const check = FIELD_CHECKS[eventType];
     if (!check) continue;
@@ -394,9 +406,11 @@ async function main() {
   process.exitCode = 1;
 }
 
-try {
-  await main();
-} catch (err) {
-  console.error(`[reconcile] ${err.message}`);
-  process.exitCode = 2;
+if (isMain) {
+  try {
+    await main();
+  } catch (err) {
+    console.error(`[reconcile] ${err.message}`);
+    process.exitCode = 2;
+  }
 }

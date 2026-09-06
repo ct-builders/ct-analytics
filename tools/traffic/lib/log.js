@@ -61,6 +61,14 @@ export function sessionRecord({ session, sessionId, driver, profile, outcome, ex
     // The instructions, verbatim. A step is one shopper action; the driver
     // may turn it into more than one event.
     steps: session.steps.map(summariseStep),
+    // The same steps, but only the ones the driver actually got through, in
+    // the order it got through them. A skipped step (a control that moved, a
+    // facet the live listing never offered) has no event behind it, so
+    // matching the reconciler's per-type field checks against `steps` above
+    // shifts every comparison after a skip by one slot and blames the
+    // tracking for a value it was never given the chance to record. This is
+    // what the field checks should walk instead, whenever the driver reports it.
+    ...(outcome?.performed ? { performedSteps: outcome.performed.map(summariseStep) } : {}),
     // What the driver could not do, and why. Kept beside the intent so a run
     // is diagnosable without re-running it, and so a driver gap is never
     // mistaken for lost tracking.
