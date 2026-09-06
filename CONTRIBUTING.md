@@ -1,6 +1,6 @@
 # Contributing
 
-Commerce Clickstream is unsupported reference code. Contributions are welcome but may not be
+ct-analytics is unsupported reference code. Contributions are welcome but may not be
 reviewed promptly, and forking is a perfectly good outcome.
 
 ## Ground rules

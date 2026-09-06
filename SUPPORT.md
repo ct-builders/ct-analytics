@@ -1,6 +1,6 @@
 # Support
 
-Commerce Clickstream is provided **as is and unsupported**.
+ct-analytics is provided **as is and unsupported**.
 
 It is reference code, published so it can be read, copied and adapted. There is
 no support channel, no service-level commitment, and no guarantee that issues

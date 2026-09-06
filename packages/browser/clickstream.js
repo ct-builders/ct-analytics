@@ -5,7 +5,7 @@
  */
 
 /**
- * Commerce Clickstream — shopper journey capture for ecommerce sites.
+ * ct-analytics — shopper journey capture for ecommerce sites.
  *
  * One file, plain JavaScript, no build step and no dependencies. It runs as a
  * classic script tag, so it drops into a Next.js storefront, a hand-written

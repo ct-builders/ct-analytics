@@ -245,11 +245,11 @@ export function layout({ title, activeKey, filters, body }) {
 <html lang="en"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${esc(title)} · Commerce Clickstream</title>
+<title>${esc(title)} · ct-analytics</title>
 <style>${CSS}</style>
 </head><body><div class="wrap">
 <nav>
-  <div class="brand">Clickstream<span>shopper analytics</span></div>
+  <div class="brand">ct-analytics<span>shopper analytics</span></div>
   ${nav}
   <div class="group">Reference</div>
   <a href="/events${tail}">Event taxonomy</a>

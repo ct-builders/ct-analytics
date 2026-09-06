@@ -1,6 +1,6 @@
-# Commerce Clickstream
+# ct-analytics
 
-Commerce Clickstream records what shoppers actually do on an ecommerce site — what they
+ct-analytics records what shoppers actually do on an ecommerce site — what they
 searched for, which filters they clicked, which product they chose, what they
 added to the cart, and what they bought — and answers the question a plain
 event log cannot: **which search sold this product.**
@@ -9,9 +9,15 @@ It is one JavaScript file in the browser, a Postgres collector, and a reporting
 admin. No build step, no dependencies in the browser, and one dependency on the
 server.
 
-> Commerce Clickstream is freely available reference code, provided **as is and
+> ct-analytics is freely available reference code, provided **as is and
 > unsupported**. It is meant to be read, lifted and adapted. See
 > [SUPPORT.md](SUPPORT.md).
+
+The wire contract is spelled `clickstream`: the browser global
+`window.clickstream`, the `data-clickstream` markup attributes, the
+`CLICKSTREAM_*` environment variables and the `clickstream` Postgres schema.
+Those are the names an integration writes down, so they stay put — `ct-analytics`
+is what the project is called, not what its API is called.
 
 ## Install
 

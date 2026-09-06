@@ -148,7 +148,7 @@ function gatePage({ open, error, name }) {
 <html lang="en"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${esc(name || 'Commerce Clickstream')} — access</title>
+<title>${esc(name || 'ct-analytics')} — access</title>
 <style>
   :root { --border:#e2e5ea; --text:#1a1d21; --muted:#61666e; --accent:#0b6bcb; --bad:#b3261e; --panel:#f7f8fa; }
   * { box-sizing:border-box; }
