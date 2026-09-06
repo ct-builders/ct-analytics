@@ -148,6 +148,65 @@ test('a result click settles the listing before reading or clicking a card, clos
   );
 });
 
+test("a result click waits for the PDP to actually render before dwelling, closing the window where the next clickResult's goBack leaves before this page's own view fires", async () => {
+  // The PDP is an async server component: `domcontentloaded` resolves before
+  // the product fetch that gates `TrackEvent` has even started. A short
+  // dwell followed immediately by the next clickResult's goBack can leave
+  // this page before `product_view` ever mounts, dropping the view for a
+  // page that was genuinely visited. Waiting for the add-to-cart control —
+  // rendered from the same fetch TrackEvent depends on — is the real signal.
+  const calls = [];
+  const cardHref = '/en-us/walnut-cabinet/p/WCS-09';
+  const page = {
+    url: () => 'https://x/en-us/search?q=cabinet',
+    async waitForLoadState(state) {
+      calls.push(`waitForLoadState:${state ?? 'load'}`);
+    },
+    async waitForTimeout() {},
+    async goBack() {},
+    locator(selector) {
+      calls.push(`locator:${selector}`);
+      return {
+        first() {
+          return this;
+        },
+        async waitFor() {
+          calls.push(`waitFor:${selector}`);
+        },
+        async count() {
+          return 1;
+        },
+        nth() {
+          return {
+            async getAttribute() {
+              return cardHref;
+            },
+            async click() {
+              calls.push('card.click');
+            }
+          };
+        }
+      };
+    }
+  };
+  const profileWithSelectors = {
+    ...profile,
+    selectors: { resultCard: "a[href*='/p/']", addToCart: "button:has-text('Add to Cart')" }
+  };
+  const step = { t: 'clickResult', rank: 1, product: { sku: 'SCG-09' } };
+
+  const result = await perform(page, 'https://x', profileWithSelectors, step, {}, {});
+
+  assert.equal(result, true);
+  const clickIndex = calls.indexOf('card.click');
+  const waitIndex = calls.indexOf(`waitFor:${profileWithSelectors.selectors.addToCart}`);
+  assert.notEqual(waitIndex, -1, 'waits on the add-to-cart control before moving on');
+  assert.ok(
+    clickIndex < waitIndex,
+    'waits AFTER the click lands, before dwelling — otherwise the next step can leave before this page`s own product_view fires'
+  );
+});
+
 test('a facet click waits for the URL to actually reflect the toggle before the next step can click the same chip', async () => {
   // applyFacet and removeFacet share one selector — the same chip toggles
   // both ways. A removeFacet step right after applyFacet clicks that chip
