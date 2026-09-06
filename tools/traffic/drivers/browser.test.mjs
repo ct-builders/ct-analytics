@@ -148,6 +148,54 @@ test('a result click settles the listing before reading or clicking a card, clos
   );
 });
 
+test('a facet click settles on network idle before the next step can click the same chip', async () => {
+  // applyFacet and removeFacet share one selector — the same chip toggles
+  // both ways. A removeFacet step right after applyFacet clicks that chip
+  // again before its own step returns, so if THIS click does not settle
+  // first, the next click can land while React is still on the pre-click
+  // render and read the wrong toggle state.
+  const calls = [];
+  const page = {
+    url: () => 'https://x/en-us/category/dressers?eco-claims=low-voc-finish',
+    async waitForLoadState(state) {
+      calls.push(`waitForLoadState:${state ?? 'load'}`);
+    },
+    async waitForTimeout() {},
+    locator() {
+      return {
+        first() {
+          return this;
+        },
+        async waitFor() {
+          calls.push('chip.waitFor:attached');
+        },
+        async count() {
+          return 1;
+        },
+        async click() {
+          calls.push('chip.click');
+        }
+      };
+    }
+  };
+  const profileWithSelectors = {
+    ...profile,
+    selectors: { facetChip: "button:has-text('{value}')" }
+  };
+  const step = { t: 'removeFacet', name: 'eco-claims', value: 'low-voc-finish' };
+
+  const result = await perform(page, 'https://x', profileWithSelectors, step, {});
+
+  assert.equal(result, true);
+  const clickIndex = calls.indexOf('chip.click');
+  const settleIndex = calls.indexOf('waitForLoadState:networkidle');
+  assert.notEqual(settleIndex, -1, 'settles on network idle after the click');
+  assert.ok(
+    clickIndex < settleIndex,
+    'settles AFTER clicking, before returning — otherwise the next facet step can race this one'
+  );
+});
+
 test('productFromPath extracts slug and sku together, not just the sku half', () => {
   assert.deepEqual(productFromPath('/en-us/walnut-cabinet/p/WCS-09'), {
     slug: 'walnut-cabinet',

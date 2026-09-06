@@ -393,7 +393,14 @@ export async function perform(page, base, profile, step, session, lastClick = {}
       await chip.waitFor({ state: 'attached', timeout: 3000 }).catch(() => {});
       if (!(await chip.count())) return `no facet control for ${step.name}=${step.value}`;
       await chip.click();
-      await page.waitForLoadState('domcontentloaded').catch(() => {});
+      // The click is a client-side transition, not a full navigation, so
+      // `domcontentloaded` resolves immediately and proves nothing. Without
+      // settling here, a removeFacet step right after an applyFacet can
+      // click the SAME chip before React has committed the toggled state —
+      // the handler still reads the pre-click value and reapplies instead
+      // of removing, which is why apply_facet came in doubled and
+      // facet_remove never arrived at all.
+      await page.waitForLoadState('networkidle', { timeout: 4000 }).catch(() => {});
       await dwell('default');
       return true;
     }
