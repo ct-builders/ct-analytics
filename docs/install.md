@@ -1,4 +1,4 @@
-# Installing Commerce Clickstream on a site
+# Installing ct-analytics on a site
 
 Three levels of integration. A site can use any mix of them, and they compose
 without double-counting.

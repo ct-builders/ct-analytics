@@ -70,7 +70,7 @@ function authorize(req, res, params) {
 
 function errorPage(title, detail) {
   return `<!doctype html><html lang="en"><head><meta charset="utf-8">
-<title>${esc(title)} · Commerce Clickstream</title>
+<title>${esc(title)} · ct-analytics</title>
 <style>body{font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
 background:#fff;color:#1a1d21;margin:0;display:grid;place-items:center;min-height:100vh}
 div{max-width:34rem;padding:24px}h1{font-size:18px;margin:0 0 8px}

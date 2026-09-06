@@ -1,10 +1,10 @@
-# Standing up Commerce Clickstream on Google Cloud
+# Standing up ct-analytics on Google Cloud
 
-Commerce Clickstream needs a Postgres database and somewhere to run one Node process. On
+ct-analytics needs a Postgres database and somewhere to run one Node process. On
 Google Cloud that is Cloud SQL and Cloud Run, and the whole thing fits in a
 handful of commands.
 
-Any Postgres 14 or later works. Nothing in Commerce Clickstream is Google-specific — if you
+Any Postgres 14 or later works. Nothing in ct-analytics is Google-specific — if you
 already run Postgres somewhere, set `DATABASE_URL` and skip to
 [Deploy the collector](#deploy-the-collector).
 
@@ -254,7 +254,7 @@ holds tens of millions of them.
 
 If volume outgrows a single Postgres, the shape to reach for is exporting
 `events` to BigQuery on a schedule and repointing the heavier reports at it.
-Commerce Clickstream does not ship that, and the reports are written in one dialect on
+ct-analytics does not ship that, and the reports are written in one dialect on
 purpose: writing every query twice to keep two backends in step costs more than
 it saves until the volume is genuinely there.
 

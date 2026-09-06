@@ -1,4 +1,4 @@
-# What Commerce Clickstream stores about people
+# What ct-analytics stores about people
 
 A plain account of the data, and of the decisions the module leaves to you.
 
@@ -75,7 +75,7 @@ nightly cleanup loses events permanently, since the browser does not retry.
 
 ## Consent
 
-Commerce Clickstream does not ship a consent banner and does not check for one. Whether you
+ct-analytics does not ship a consent banner and does not check for one. Whether you
 need consent depends on your jurisdiction and on what your site chooses to
 report — and the honest position is that the storage itself is first-party and
 functional, while `customerRef` is personal data by any reading.

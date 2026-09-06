@@ -1,5 +1,5 @@
 {
-  "name": "commerce-clickstream",
+  "name": "ct-analytics",
   "version": "0.1.0",
   "private": true,
   "description": "Shopper journey analytics for ecommerce sites — one script tag, a Postgres collector, and a reporting admin",
